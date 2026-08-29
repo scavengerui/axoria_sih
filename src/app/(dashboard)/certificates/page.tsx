@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
 import { getUserCertificates } from "@/lib/actions/enrollment";
@@ -44,7 +45,8 @@ const DEFAULT_CERTIFICATES: CertificateItem[] = [
 
 export default function CertificatesPage() {
   const { user } = useUser();
-  const [certificates, setCertificates] = useState<CertificateItem[]>(DEFAULT_CERTIFICATES);
+  const [certificates, setCertificates] = useState<CertificateItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCert, setSelectedCert] = useState<CertificateItem | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
@@ -54,7 +56,7 @@ export default function CertificatesPage() {
       if (!user?.id) return;
       try {
         const res = await getUserCertificates(user.id);
-        if (res.success && res.certificates.length > 0) {
+        if (res.success && res.certificates) {
           const formatted = res.certificates.map((c: any) => ({
             id: c._id,
             courseName: c.courseId?.title || "Enterprise Capability Training",
@@ -67,6 +69,8 @@ export default function CertificatesPage() {
         }
       } catch (err) {
         console.error("Error loading certificates:", err);
+      } finally {
+        setLoading(false);
       }
     }
     loadCerts();
@@ -214,7 +218,18 @@ export default function CertificatesPage() {
         </p>
       </div>
 
-      {certificates.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2].map((i) => (
+            <Card key={i} className="p-6 space-y-4 border-border">
+              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-9 w-full rounded-lg" />
+            </Card>
+          ))}
+        </div>
+      ) : certificates.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 px-4 text-center border rounded-xl border-dashed bg-muted/10">
           <Award className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
           <h3 className="text-xl font-semibold">No certificates yet</h3>
