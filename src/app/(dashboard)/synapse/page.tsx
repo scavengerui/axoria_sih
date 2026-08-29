@@ -75,34 +75,45 @@ export default function SynapsePage() {
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [isAnsweringDoubt, setIsAnsweringDoubt] = useState(false);
 
-  // Handle File Upload (txt, md, json, pdf, pptx text reading)
+  // Handle File Upload (txt, md, json, pdf, pptx, docx text reading via server parser)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setDocTitle(file.name.replace(/\.[^/.]+$/, ""));
-    toast.info(`Reading "${file.name}"...`);
+    const readableName = file.name.replace(/\.[^/.]+$/, "");
+    setDocTitle(readableName);
+    toast.info(`Extracting clean text from "${file.name}"...`);
 
     try {
-      if (file.name.endsWith(".txt") || file.name.endsWith(".md") || file.name.endsWith(".json") || file.name.endsWith(".csv")) {
+      if (
+        file.name.endsWith(".txt") ||
+        file.name.endsWith(".md") ||
+        file.name.endsWith(".json") ||
+        file.name.endsWith(".csv")
+      ) {
         const text = await file.text();
         setDocContent(text);
         toast.success(`Extracted ${text.length} characters from ${file.name}`);
       } else {
-        // Fallback text reading for binary/office files
-        const text = await file.text();
-        // Filter readable ASCII strings from document stream
-        const cleaned = text.replace(/[^\x20-\x7E\n\r\t]/g, " ").replace(/\s+/g, " ").slice(0, 30000);
-        if (cleaned.length > 100) {
-          setDocContent(cleaned);
-          toast.success(`Document text extracted (${cleaned.length} chars)`);
+        // Use server-side clean text extractor
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch("/api/parse-document", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await res.json();
+        if (data.success && data.text) {
+          setDocContent(data.text);
+          toast.success(`Extracted ${data.textLength} characters from ${file.name}`);
         } else {
-          setDocContent(SAMPLE_DOCUMENT_TEXT);
-          toast.info("Parsed document structure into Synapse context.");
+          toast.error(data.error || "Could not read binary stream. Please paste text directly.");
         }
       }
-    } catch {
-      toast.error("Failed to parse file. You can paste the content directly.");
+    } catch (err: any) {
+      toast.error("Failed to parse file: " + err.message);
     }
   };
 
@@ -122,9 +133,15 @@ export default function SynapsePage() {
     toast.info("Synapse is analyzing document with Groq Llama 3.3...");
 
     try {
+      // Clean any accidental binary stream characters if raw PDF stream was pasted
+      let textToSend = docContent;
+      if (textToSend.includes("%PDF-") || textToSend.includes("/FlateDecode") || textToSend.includes("endobj")) {
+        textToSend = textToSend.replace(/[^\x20-\x7E\n\r\t]/g, " ").replace(/\s+/g, " ").trim();
+      }
+
       const res = await analyzeDocumentWithSynapse(
         docTitle.trim() || "Uploaded Document",
-        docContent
+        textToSend
       );
 
       if (res.success && res.data) {
@@ -142,7 +159,7 @@ export default function SynapsePage() {
         ]);
         toast.success("Synapse Analysis Complete! ⚡");
       } else {
-        toast.error("Failed to analyze document. Please check Groq API key.");
+        toast.error(res.error || "Failed to analyze document. Please check your Groq API key.");
       }
     } catch (err: any) {
       toast.error("Groq AI analysis error: " + err.message);

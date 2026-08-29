@@ -1,13 +1,13 @@
 import Groq from "groq-sdk";
 
-// Models matching the active models from your Groq dashboard
-export const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
+// Valid official active production models on Groq
+export const DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile";
 export const FALLBACK_GROQ_MODELS = [
-  "openai/gpt-oss-120b",
-  "openai/gpt-oss-20b",
-  "qwen/qwen3.8-27b",
-  "qwen/qwen3.6-27b",
-  "groq/compound-mini",
+  "llama-3.3-70b-versatile",
+  "llama-3.1-70b-versatile",
+  "llama-3.1-8b-instant",
+  "mixtral-8x7b-32768",
+  "gemma2-9b-it",
 ];
 
 export function getGroqClient() {
