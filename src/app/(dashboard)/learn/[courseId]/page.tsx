@@ -291,23 +291,33 @@ export default function CoursePlayerPage({
     setQuizScore(score);
     setQuizSubmitted(true);
 
-    if (score >= 70) {
-      toast.success(`Assessment Passed with ${score}%! 🏆`);
-      const nextSet = new Set(completedLessons);
-      nextSet.add(currentLesson.id);
+    if (score >= 60) {
+      toast.success(`🎉 Capstone Exam Passed with ${score}%! Official Certificate Issued! 🏆`);
+      const nextSet = new Set(flatLessons.map((l) => l.id));
       setCompletedLessons(nextSet);
 
       if (user?.id) {
-        await createNotification({
-          userId: user.id,
-          type: "certificate",
-          title: `Assessment Passed: ${course.title}`,
-          message: `Score: ${score}%. Certificate #${course.id} issued.`,
-          link: "/certificates",
-        });
+        try {
+          await updateLessonProgress({
+            userId: user.id,
+            courseId: course.id,
+            lessonId: currentLesson.id,
+            totalLessons: flatLessons.length,
+          });
+
+          await createNotification({
+            userId: user.id,
+            type: "certificate",
+            title: `🏆 Certified: ${course.title}`,
+            message: `You achieved ${score}% on the Capstone Exam. Your verified Certificate #${course.id} is available for download.`,
+            link: "/certificates",
+          });
+        } catch (err) {
+          console.error("Certificate sync notice:", err);
+        }
       }
     } else {
-      toast.error(`Score: ${score}%. Minimum passing threshold is 70%.`);
+      toast.error(`Score: ${score}%. Minimum passing threshold is 60%. Review the reading sections and retake to earn your certificate.`);
     }
   };
 
@@ -735,10 +745,12 @@ export default function CoursePlayerPage({
                 <Sparkles className="w-3 h-3 text-primary" /> AI Assessment
               </Badge>
               <Badge variant="outline" className="text-[10px]">
-                Passing Score: 70%
+                Passing Score: 60%
               </Badge>
             </div>
-            <DialogTitle className="text-lg font-bold">{course.quiz?.title || "Assessment"}</DialogTitle>
+            <DialogTitle className="text-lg font-bold">
+              {course.quiz?.title || "Final Capstone Certification Exam"}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6 pt-3">
@@ -797,21 +809,29 @@ export default function CoursePlayerPage({
               {quizSubmitted ? (
                 <div className="flex items-center gap-3">
                   <Badge
-                    variant={quizScore >= 70 ? "secondary" : "destructive"}
+                    variant={quizScore >= 60 ? "secondary" : "destructive"}
                     className={cn(
                       "text-xs px-2.5 py-1",
-                      quizScore >= 70 && "bg-success/15 text-success border-success/30"
+                      quizScore >= 60 && "bg-success/15 text-success border-success/30"
                     )}
                   >
-                    Your Score: {quizScore}% {quizScore >= 70 ? "🎉 Passed" : "⚠️ Try Again"}
+                    Your Score: {quizScore}% {quizScore >= 60 ? "🎉 Passed & Certified" : "⚠️ Try Again (Need 60%)"}
                   </Badge>
-                  <Button variant="outline" size="sm" onClick={handleQuizReset} className="text-xs h-8">
-                    <RefreshCw className="h-3 w-3 mr-1" /> Retake Quiz
-                  </Button>
+                  {quizScore >= 60 ? (
+                    <Link href="/certificates">
+                      <Button size="sm" className="text-xs h-8 gap-1.5 font-semibold bg-success hover:bg-success/90 text-white">
+                        <Award className="h-3.5 w-3.5" /> View Certificate
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={handleQuizReset} className="text-xs h-8">
+                      <RefreshCw className="h-3 w-3 mr-1" /> Retake Exam
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <span className="text-xs text-muted-foreground">
-                  Answer all questions and submit to validate competency.
+                  Score 60% or higher to pass and unlock your verified certificate.
                 </span>
               )}
 
@@ -826,7 +846,7 @@ export default function CoursePlayerPage({
                     disabled={Object.keys(selectedAnswers).length < (course.quiz?.questions?.length || 1)}
                     className="text-xs h-8 font-semibold"
                   >
-                    Submit Answers
+                    Submit Exam Answers
                   </Button>
                 )}
               </div>
