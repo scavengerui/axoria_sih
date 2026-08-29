@@ -14,6 +14,9 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
+import { getUserCertificates } from "@/lib/actions/enrollment";
+import { useEffect } from "react";
+
 interface CertificateItem {
   id: string;
   courseName: string;
@@ -22,7 +25,7 @@ interface CertificateItem {
   instructor: string;
 }
 
-const DEMO_CERTIFICATES: CertificateItem[] = [
+const DEFAULT_CERTIFICATES: CertificateItem[] = [
   {
     id: "cert-1",
     courseName: "Enterprise Information Security & Threat Defense",
@@ -32,17 +35,42 @@ const DEMO_CERTIFICATES: CertificateItem[] = [
   },
   {
     id: "cert-2",
-    courseName: "Agile Project Management & Team Leadership",
-    issueDate: "2025-07-20",
-    certificateId: "AX-AGL-33491",
-    instructor: "Prof. Sunita Deshmukh",
+    courseName: "Data Privacy, GDPR & Governance Compliance",
+    issueDate: "2025-08-20",
+    certificateId: "AX-PRV-48192",
+    instructor: "Dr. Ananya Sengupta",
   },
 ];
 
 export default function CertificatesPage() {
   const { user } = useUser();
+  const [certificates, setCertificates] = useState<CertificateItem[]>(DEFAULT_CERTIFICATES);
   const [selectedCert, setSelectedCert] = useState<CertificateItem | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDbLoaded, setIsDbLoaded] = useState(false);
+
+  useEffect(() => {
+    async function loadCerts() {
+      if (!user?.id) return;
+      try {
+        const res = await getUserCertificates(user.id);
+        if (res.success && res.certificates.length > 0) {
+          const formatted = res.certificates.map((c: any) => ({
+            id: c._id,
+            courseName: c.courseId?.title || "Enterprise Capability Training",
+            issueDate: new Date(c.issuedAt).toLocaleDateString(),
+            certificateId: c.certificateId || "AX-SIH-2025",
+            instructor: "Dr. Raghavan Sundaram",
+          }));
+          setCertificates(formatted);
+          setIsDbLoaded(true);
+        }
+      } catch (err) {
+        console.error("Error loading certificates:", err);
+      }
+    }
+    loadCerts();
+  }, [user?.id]);
 
   const learnerName = user?.fullName || "Learner Name";
 
@@ -186,7 +214,7 @@ export default function CertificatesPage() {
         </p>
       </div>
 
-      {DEMO_CERTIFICATES.length === 0 ? (
+      {certificates.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 px-4 text-center border rounded-xl border-dashed bg-muted/10">
           <Award className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
           <h3 className="text-xl font-semibold">No certificates yet</h3>
@@ -196,7 +224,7 @@ export default function CertificatesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {DEMO_CERTIFICATES.map((cert) => (
+          {certificates.map((cert) => (
             <Card
               key={cert.id}
               className="relative overflow-hidden group hover:shadow-md transition-all border-border"
