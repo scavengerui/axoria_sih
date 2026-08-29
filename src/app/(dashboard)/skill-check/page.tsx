@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useUser, useOrganization } from "@clerk/nextjs";
 import {
   Compass,
   Sparkles,
@@ -27,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { generateIdeaSkillCheck } from "@/lib/actions/ai";
+import { generatePersonalAICourse } from "@/lib/actions/course";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -41,12 +43,15 @@ const SAMPLE_IDEAS = [
 
 export default function SkillCheckPage() {
   const router = useRouter();
+  const { user } = useUser();
+  const { organization } = useOrganization();
 
   // Configuration Form State
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState<"Beginner" | "Intermediate" | "Advanced" | "Expert">("Intermediate");
   const [questionCount, setQuestionCount] = useState<number>(10);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isCreatingCourse, setIsCreatingCourse] = useState(false);
 
   // Test Runner State
   const [testActive, setTestActive] = useState(false);
@@ -116,6 +121,41 @@ export default function SkillCheckPage() {
       toast.success(`👏 Good performance! Score: ${score}% (${correct}/${questions.length})`);
     } else {
       toast.info(`Score: ${score}% (${correct}/${questions.length}). Review your results below.`);
+    }
+  };
+
+  const handleGenerateCourseOnTopic = async () => {
+    if (isCreatingCourse) return;
+    if (!user?.id) {
+      toast.error("Please sign in to generate and save courses.");
+      return;
+    }
+
+    setIsCreatingCourse(true);
+    toast.info(`Synthesizing full personalized curriculum on "${topic}" with Groq AI...`);
+
+    try {
+      const res = await generatePersonalAICourse({
+        topic: topic.trim(),
+        userId: user.id,
+        orgId: organization?.id || "axoria_enterprise",
+        preferences: {
+          difficulty: difficulty === "Expert" ? "Advanced" : difficulty,
+          quizCount: 3,
+          flashcardCount: 4,
+        },
+      });
+
+      if (res.success && res.courseId) {
+        toast.success(`🎉 Course created! Opening your course player...`);
+        router.push(`/learn/${res.courseId}`);
+      } else {
+        toast.error(res.error || "Failed to generate course.");
+      }
+    } catch (err: any) {
+      toast.error("Generation error: " + err.message);
+    } finally {
+      setIsCreatingCourse(false);
     }
   };
 
@@ -454,11 +494,22 @@ export default function SkillCheckPage() {
                   <RefreshCw className="w-3.5 h-3.5" /> Test Another Idea
                 </Button>
 
-                <Link href="/catalog">
-                  <Button size="sm" className="text-xs h-9 gap-1.5 font-semibold">
-                    <BookOpen className="w-3.5 h-3.5" /> Generate Full Course on &ldquo;{topic}&rdquo;
-                  </Button>
-                </Link>
+                <Button
+                  size="sm"
+                  onClick={handleGenerateCourseOnTopic}
+                  disabled={isCreatingCourse}
+                  className="text-xs h-9 gap-1.5 font-semibold"
+                >
+                  {isCreatingCourse ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Building Course & Enrolling...
+                    </>
+                  ) : (
+                    <>
+                      <BookOpen className="w-3.5 h-3.5" /> Generate Full Course on &ldquo;{topic}&rdquo; <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           </Card>

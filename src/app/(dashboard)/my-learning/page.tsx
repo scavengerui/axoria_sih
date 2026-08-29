@@ -55,7 +55,7 @@ export default function MyLearningPage() {
               id: courseId,
               title: courseTitle,
               instructor: instructor,
-              progress: e.progress || (e.status === "completed" ? 100 : 25),
+              progress: typeof e.progress === "number" ? e.progress : (e.status === "completed" ? 100 : 0),
               dueDate: e.dueDate ? new Date(e.dueDate).toLocaleDateString() : null,
               isMandatory: e.mandatory || false,
               completedDate: e.completedAt ? new Date(e.completedAt).toLocaleDateString() : "Recently",
