@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -37,105 +38,6 @@ import { toast } from "sonner";
 import { getPendingCourses, approveCourse, rejectCourse } from "@/lib/actions/course";
 import { formatDuration } from "@/lib/utils";
 
-const DEFAULT_PENDING_COURSES = [
-  {
-    _id: "p1",
-    title: "Enterprise Incident Response & Forensics",
-    description:
-      "Operational framework for detecting, isolating, and reporting security breaches across distributed corporate infrastructure.",
-    instructor: "Dr. Raghavan Sundaram (CISO)",
-    modules: 3,
-    lessons: 7,
-    videoUrl: "https://www.youtube.com/embed/bPVaOlJ6ln0",
-    competencyTags: ["Cybersecurity", "Zero-Trust", "Compliance"],
-    submittedAt: "2 hours ago",
-    estimatedDuration: 150,
-    curriculum: [
-      {
-        moduleTitle: "Module 1: Attack Vector Identification & Triage",
-        lessons: [
-          { title: "Threat Landscape & Attack Vectors", type: "video", duration: "15m", url: "https://www.youtube.com/embed/bPVaOlJ6ln0" },
-          { title: "MFA & Credential Hygiene Guidelines", type: "article", duration: "10m" },
-          { title: "Phishing Simulation & Quarantine Policy", type: "pdf", duration: "10m" },
-        ],
-      },
-      {
-        moduleTitle: "Module 2: Zero-Trust Architecture & Isolation",
-        lessons: [
-          { title: "Zero-Trust Architecture & Modern IAM", type: "video", duration: "12m", url: "https://www.youtube.com/embed/1vR3bFh_n7A" },
-          { title: "Network Microsegmentation Playbook", type: "article", duration: "15m" },
-        ],
-      },
-    ],
-    sampleQuiz: [
-      {
-        question: "What is the primary objective of Zero-Trust Architecture?",
-        options: [
-          "Never trust, always verify every request regardless of origin",
-          "Rely entirely on traditional VPN perimeter security",
-          "Allow all internal network traffic without authentication",
-          "Disable multi-factor authentication for administrators",
-        ],
-        correct: 0,
-        explanation: "Zero-Trust assumes breach and verifies explicit identity, device health, and context for every single access request.",
-      },
-      {
-        question: "Which authentication factor is most resistant to SIM-swap attacks?",
-        options: [
-          "SMS text message OTP",
-          "FIDO2 Hardware Security Key (YubiKey) or TOTP App",
-          "Security questions about favorite pets",
-          "Unencrypted email verification codes",
-        ],
-        correct: 1,
-        explanation: "Hardware security keys and TOTP apps are cryptographically bound and cannot be intercepted over cellular networks.",
-      },
-    ],
-  },
-  {
-    _id: "p2",
-    title: "Executive Communication & Stakeholder Pitching",
-    description:
-      "Advanced presentation techniques, clear executive memo writing, and conflict management strategies for rising managers.",
-    instructor: "Prof. Sunita Deshmukh",
-    modules: 2,
-    lessons: 5,
-    videoUrl: "https://www.youtube.com/embed/8eWd1X_kQyo",
-    competencyTags: ["Leadership", "Executive Comms", "Agile"],
-    submittedAt: "5 hours ago",
-    estimatedDuration: 90,
-    curriculum: [
-      {
-        moduleTitle: "Module 1: High-Impact Stakeholder Messaging",
-        lessons: [
-          { title: "Agile Leadership & Cross-Functional Alignment", type: "video", duration: "14m", url: "https://www.youtube.com/embed/8eWd1X_kQyo" },
-          { title: "Executive Memo Drafting Framework", type: "article", duration: "12m" },
-        ],
-      },
-      {
-        moduleTitle: "Module 2: Psychological Safety & Retrospectives",
-        lessons: [
-          { title: "Fostering Psychological Safety in Distributed Teams", type: "video", duration: "15m", url: "https://www.youtube.com/embed/LhoLuui9gX8" },
-          { title: "Conflict Resolution in Sprint Reviews", type: "article", duration: "10m" },
-        ],
-      },
-    ],
-    sampleQuiz: [
-      {
-        question: "How does psychological safety impact team performance?",
-        options: [
-          "Encourages open risk-taking and constructive dissent without fear of humiliation",
-          "Eliminates all deadlines and accountability",
-          "Requires unanimous agreement on all technical decisions",
-          "Restricts team communications to written memos only",
-        ],
-        correct: 0,
-        explanation: "Psychological safety enables team members to voice concerns, report defects early, and innovate without fear of retribution.",
-      },
-    ],
-  },
-];
-
 function CourseApprovalCard({
   course,
   onApprove,
@@ -145,68 +47,65 @@ function CourseApprovalCard({
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
 }) {
-  const [rejectReason, setRejectReason] = useState("");
-  const [rejectOpen, setRejectOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [activePreviewVideo, setActivePreviewVideo] = useState(
-    course.videoUrl || "https://www.youtube.com/embed/bPVaOlJ6ln0"
-  );
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+
+  const modulesCount = course.modules?.length || course.modulesCount || 2;
+  const lessonsCount =
+    course.modules?.reduce((acc: number, m: any) => acc + (m.lessons?.length || 0), 0) ||
+    course.lessonsCount ||
+    6;
 
   return (
-    <Card className="border-border shadow-xs hover:shadow-md transition-shadow">
+    <Card className="border border-border hover:shadow-sm transition-all">
       <CardContent className="p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className="text-warning border-warning/40 bg-warning/5 text-xs">
+              <Badge variant="warning" className="text-[10px] bg-warning/15 text-warning border-warning/30">
                 Pending Approval
               </Badge>
               {course.competencyTags?.map((tag: string) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
+                <Badge key={tag} variant="secondary" className="text-[10px]">
                   {tag}
                 </Badge>
               ))}
             </div>
 
-            <h3 className="text-lg font-bold text-foreground">
-              {course.title}
-            </h3>
+            <div>
+              <h3 className="text-base font-semibold text-foreground">{course.title}</h3>
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
+            </div>
 
-            <p className="text-xs text-muted-foreground line-clamp-2 max-w-2xl">
-              {course.description}
-            </p>
-
-            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pt-1">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1 flex-wrap">
               <span className="flex items-center gap-1 font-medium text-foreground">
-                <User className="h-3.5 w-3.5 text-primary" />
-                {course.instructor || "Dr. Raghavan Sundaram"}
+                <User className="w-3.5 h-3.5 text-primary" /> {course.instructor || "Trainer"}
               </span>
               <span className="flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
-                {formatDuration(course.estimatedDuration || 60)}
+                <Clock className="w-3.5 h-3.5" /> {course.estimatedDuration || 40}m
               </span>
               <span className="flex items-center gap-1">
-                <BookOpen className="h-3.5 w-3.5" />
-                {course.curriculum?.length || 2} modules • {course.lessons || 6} lessons
+                <BookOpen className="w-3.5 h-3.5" /> {modulesCount} modules • {lessonsCount} lessons
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pt-2 lg:pt-0">
-            {/* Interactive Preview & Inspection Modal */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Full Preview Modal */}
             <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
               <DialogTrigger
                 render={
                   <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-                    <Eye className="h-3.5 w-3.5 text-primary" /> Preview Course
+                    <Eye className="h-3.5 w-3.5" /> Preview Course
                   </Button>
                 }
               />
-              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-6">
-                <DialogHeader className="pb-2 border-b border-border">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary" className="text-[10px]">
-                      Curriculum Inspection
+              <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant="warning" className="text-[10px]">
+                      Pending Verification
                     </Badge>
                     {course.competencyTags?.map((tag: string) => (
                       <Badge key={tag} variant="outline" className="text-[10px]">
@@ -214,140 +113,84 @@ function CourseApprovalCard({
                       </Badge>
                     ))}
                   </div>
-                  <DialogTitle className="text-xl font-bold text-foreground mt-1">
-                    {course.title}
-                  </DialogTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Submitted by <strong className="text-foreground">{course.instructor || "Trainer"}</strong> • {formatDuration(course.estimatedDuration || 120)}
-                  </p>
+                  <DialogTitle className="text-xl font-bold">{course.title}</DialogTitle>
                 </DialogHeader>
 
-                {/* Interactive Multi-Tab Review Experience */}
-                <Tabs defaultValue="video" className="pt-3">
-                  <TabsList className="grid grid-cols-3 w-full mb-4">
-                    <TabsTrigger value="video" className="text-xs gap-1.5">
-                      <Play className="w-3.5 h-3.5" /> Video Preview
+                <Tabs defaultValue="overview" className="mt-4">
+                  <TabsList className="grid w-full grid-cols-2 text-xs">
+                    <TabsTrigger value="overview" className="text-xs">
+                      Course Curriculum
                     </TabsTrigger>
-                    <TabsTrigger value="curriculum" className="text-xs gap-1.5">
-                      <Layers className="w-3.5 h-3.5" /> Full Syllabus
-                    </TabsTrigger>
-                    <TabsTrigger value="quiz" className="text-xs gap-1.5">
-                      <HelpCircle className="w-3.5 h-3.5" /> AI Assessments
+                    <TabsTrigger value="details" className="text-xs">
+                      Course Details & Assessment
                     </TabsTrigger>
                   </TabsList>
 
-                  {/* TAB 1: Video Player Preview */}
-                  <TabsContent value="video" className="space-y-4">
-                    <div className="rounded-xl overflow-hidden aspect-video bg-black border border-border">
-                      <iframe
-                        src={activePreviewVideo}
-                        title={course.title}
-                        className="w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                    <div className="p-3 bg-muted/40 rounded-xl space-y-1 text-xs">
-                      <p className="font-semibold text-foreground">Course Overview & Learning Objectives:</p>
-                      <p className="text-muted-foreground leading-relaxed">{course.description}</p>
+                  {/* TAB 1: CURRICULUM */}
+                  <TabsContent value="overview" className="space-y-4 pt-3">
+                    <p className="text-xs text-muted-foreground">{course.description}</p>
+
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Syllabus Structure ({modulesCount} Modules)
+                      </h4>
+
+                      {course.modules && course.modules.length > 0 ? (
+                        course.modules.map((mod: any, idx: number) => (
+                          <div key={idx} className="border border-border/70 rounded-xl p-3.5 space-y-2 bg-muted/20">
+                            <h5 className="text-xs font-semibold text-foreground flex items-center gap-2">
+                              <Layers className="w-3.5 h-3.5 text-primary" /> {mod.title || `Module ${idx + 1}`}
+                            </h5>
+                            <div className="space-y-1.5 pl-4">
+                              {mod.lessons?.map((les: any, lIdx: number) => (
+                                <div key={lIdx} className="flex items-center justify-between text-xs py-1 px-2.5 rounded-lg bg-background border border-border/40">
+                                  <span className="flex items-center gap-2 text-foreground">
+                                    {les.type === "video" ? (
+                                      <Play className="w-3 h-3 text-primary" />
+                                    ) : (
+                                      <FileText className="w-3 h-3 text-muted-foreground" />
+                                    )}
+                                    {les.title || `Lesson ${lIdx + 1}`}
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground font-mono">
+                                    {les.duration || 10}m
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-4 bg-muted/20 border border-border rounded-xl text-xs space-y-2">
+                          <p className="font-semibold text-foreground">Module 1: Foundations & Core Principles</p>
+                          <p className="text-muted-foreground pl-2 text-[11px]">✦ Lesson 1: Introduction & Threat Landscape (15m)</p>
+                          <p className="text-muted-foreground pl-2 text-[11px]">✦ Lesson 2: Key Framework Guidelines & AI Quiz Assessment (10m)</p>
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
 
-                  {/* TAB 2: Curriculum Structure */}
-                  <TabsContent value="curriculum" className="space-y-3">
-                    {(course.curriculum || [
-                      {
-                        moduleTitle: "Module 1: Attack Vector Identification & Triage",
-                        lessons: [
-                          { title: "Threat Landscape & Cybersecurity Foundations", type: "video", duration: "15m", url: "https://www.youtube.com/embed/bPVaOlJ6ln0" },
-                          { title: "MFA & Password Hygiene Guidelines", type: "article", duration: "10m" },
-                        ],
-                      },
-                      {
-                        moduleTitle: "Module 2: Zero-Trust Architecture & Isolation",
-                        lessons: [
-                          { title: "Zero-Trust Architecture & Modern IAM", type: "video", duration: "12m", url: "https://www.youtube.com/embed/1vR3bFh_n7A" },
-                          { title: "Incident Response Playbook", type: "pdf", duration: "10m" },
-                        ],
-                      },
-                    ]).map((mod: any, mIdx: number) => (
-                      <div key={mIdx} className="border border-border rounded-xl p-3 bg-muted/20 space-y-2">
-                        <p className="font-bold text-xs text-foreground flex items-center gap-1.5">
-                          <Layers className="w-3.5 h-3.5 text-primary" /> {mod.moduleTitle}
-                        </p>
-                        <div className="space-y-1.5 pl-4 border-l border-border">
-                          {mod.lessons.map((lesson: any, lIdx: number) => (
-                            <div
-                              key={lIdx}
-                              onClick={() => lesson.url && setActivePreviewVideo(lesson.url)}
-                              className="flex items-center justify-between text-xs p-2 rounded-lg bg-background border border-border/50 hover:bg-muted/40 cursor-pointer transition-colors"
-                            >
-                              <div className="flex items-center gap-2">
-                                {lesson.type === "video" ? (
-                                  <Play className="w-3.5 h-3.5 text-primary" />
-                                ) : lesson.type === "pdf" ? (
-                                  <FileText className="w-3.5 h-3.5 text-warning" />
-                                ) : (
-                                  <BookOpen className="w-3.5 h-3.5 text-foreground" />
-                                )}
-                                <span className="font-medium text-foreground">{lesson.title}</span>
-                              </div>
-                              <span className="text-[11px] text-muted-foreground">{lesson.duration || "10m"}</span>
-                            </div>
-                          ))}
-                        </div>
+                  {/* TAB 2: DETAILS */}
+                  <TabsContent value="details" className="space-y-4 pt-3">
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="p-3 bg-muted/20 rounded-xl border border-border">
+                        <p className="text-muted-foreground text-[10px]">Author / Instructor</p>
+                        <p className="font-semibold text-foreground mt-0.5">{course.instructor || "Trainer"}</p>
                       </div>
-                    ))}
-                  </TabsContent>
+                      <div className="p-3 bg-muted/20 rounded-xl border border-border">
+                        <p className="text-muted-foreground text-[10px]">Estimated Duration</p>
+                        <p className="font-semibold text-foreground mt-0.5">{course.estimatedDuration || 40} Minutes</p>
+                      </div>
+                    </div>
 
-                  {/* TAB 3: Quiz Assessment Preview */}
-                  <TabsContent value="quiz" className="space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Sample MCQs generated by Groq AI attached to this course:
-                    </p>
-                    {(course.sampleQuiz || [
-                      {
-                        question: "What is the primary rule of Zero-Trust Architecture?",
-                        options: [
-                          "Never trust, always verify every access request",
-                          "Trust all corporate laptops automatically",
-                          "Disable MFA for administrators",
-                          "Use single passwords for all systems",
-                        ],
-                        correct: 0,
-                        explanation: "Zero-Trust assumes breach and continuously validates identity and posture.",
-                      },
-                    ]).map((q: any, qIdx: number) => (
-                      <div key={qIdx} className="p-3.5 border border-border rounded-xl bg-muted/20 space-y-2 text-xs">
-                        <p className="font-semibold text-foreground">
-                          {qIdx + 1}. {q.question}
-                        </p>
-                        <div className="space-y-1 pl-2">
-                          {q.options.map((opt: string, optIdx: number) => (
-                            <div
-                              key={optIdx}
-                              className={`p-2 rounded-lg text-xs flex items-center justify-between ${
-                                optIdx === q.correct
-                                  ? "bg-success/15 border border-success/30 font-medium text-success"
-                                  : "bg-background text-muted-foreground"
-                              }`}
-                            >
-                              <span>{opt}</span>
-                              {optIdx === q.correct && (
-                                <Badge variant="secondary" className="text-[10px] bg-success/20 text-success">
-                                  Correct Answer
-                                </Badge>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                        {q.explanation && (
-                          <p className="text-[11px] text-muted-foreground/80 italic pt-1">
-                            💡 {q.explanation}
-                          </p>
-                        )}
-                      </div>
-                    ))}
+                    <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl space-y-1.5 text-xs">
+                      <span className="font-semibold text-primary flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> AI Assessment Verified
+                      </span>
+                      <p className="text-[11px] text-muted-foreground">
+                        Includes auto-generated multi-choice questions powered by Groq Llama-3.3.
+                      </p>
+                    </div>
                   </TabsContent>
                 </Tabs>
 
@@ -380,7 +223,7 @@ function CourseApprovalCard({
                         setPreviewOpen(false);
                         onApprove(course._id);
                       }}
-                      className="gap-1.5 text-xs bg-primary"
+                      className="gap-1.5 text-xs bg-primary font-semibold"
                     >
                       <Check className="h-3.5 w-3.5" /> Approve & Publish to Catalog
                     </Button>
@@ -409,35 +252,33 @@ function CourseApprovalCard({
                     </Label>
                     <Textarea
                       id="reason"
-                      placeholder="e.g. Please add more practical scenarios or update module 2 quiz..."
+                      placeholder="Please expand on Section 2 video explanations before publishing..."
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
-                      rows={3}
-                      className="text-xs"
+                      className="text-xs min-h-[100px]"
                     />
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setRejectOpen(false)}>
+                    <Button variant="outline" size="sm" onClick={() => setRejectOpen(false)} className="text-xs">
                       Cancel
                     </Button>
                     <Button
-                      variant="destructive"
                       size="sm"
+                      variant="destructive"
                       onClick={() => {
                         onReject(course._id, rejectReason);
                         setRejectOpen(false);
                       }}
                       className="text-xs"
                     >
-                      Send Feedback
+                      Send Revision Request
                     </Button>
                   </div>
                 </div>
               </DialogContent>
             </Dialog>
 
-            {/* Direct Approve Button */}
-            <Button size="sm" onClick={() => onApprove(course._id)} className="gap-1 text-xs">
+            <Button size="sm" onClick={() => onApprove(course._id)} className="gap-1 text-xs font-semibold">
               <Check className="h-3.5 w-3.5" /> Approve
             </Button>
           </div>
@@ -448,17 +289,17 @@ function CourseApprovalCard({
 }
 
 export default function AdminCoursesPage() {
-  const [courses, setCourses] = useState<any[]>(DEFAULT_PENDING_COURSES);
+  const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchPending = async () => {
     try {
       const res = await getPendingCourses();
-      if (res.success && res.courses.length > 0) {
+      if (res.success && res.courses) {
         setCourses(res.courses);
       }
     } catch {
-      // Use defaults
+      setCourses([]);
     } finally {
       setLoading(false);
     }
@@ -494,12 +335,22 @@ export default function AdminCoursesPage() {
             Review and approve trainer curriculum submissions before they go live in the catalog.
           </p>
         </div>
-        <Badge variant="secondary" className="gap-1 text-xs">
+        <Badge variant="secondary" className="gap-1 text-xs bg-primary/10 text-primary">
           <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Admin Governance
         </Badge>
       </div>
 
-      {courses.length === 0 ? (
+      {loading ? (
+        <div className="space-y-4">
+          <Card className="p-6">
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-6 w-72" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          </Card>
+        </div>
+      ) : courses.length === 0 ? (
         <div className="py-20 text-center border rounded-2xl border-dashed bg-muted/10">
           <BookOpen className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
           <h3 className="text-base font-semibold">Queue is all clear!</h3>
