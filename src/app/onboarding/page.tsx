@@ -182,8 +182,22 @@ export default function OnboardingPage() {
                 <div>
                   <CardTitle className="text-lg">Join Enterprise Workspace</CardTitle>
                   <CardDescription className="text-xs mt-1">
-                    Enter the organization invite code and select your operational role.
+                    Connect to the official organization managed by Chief Admin (sivadhanushkotturu@gmail.com).
                   </CardDescription>
+                </div>
+
+                <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-primary flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5" /> Primary Workspace: Axoria Enterprise
+                    </span>
+                    <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary">
+                      Verified
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Supervised by Chief Admin: <strong className="text-foreground">sivadhanushkotturu@gmail.com</strong>. New joiners are granted role-based workspace permissions upon entry.
+                  </p>
                 </div>
 
                 <form onSubmit={handleJoinOrganization} className="space-y-4">
@@ -205,7 +219,7 @@ export default function OnboardingPage() {
                     </div>
                     {matchedOrg && (
                       <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-0.5">
-                        <Building2 className="w-3.5 h-3.5 text-primary" /> Target:{" "}
+                        <Building2 className="w-3.5 h-3.5 text-primary" /> Target Workspace:{" "}
                         <strong className="text-foreground">{matchedOrg.name}</strong>
                       </p>
                     )}
