@@ -31,6 +31,8 @@ import {
   markAllNotificationsAsRead,
 } from "@/lib/actions/notification";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { resolveUserRole } from "@/lib/utils";
 
 interface NotificationItem {
   _id: string;
@@ -167,8 +169,7 @@ function getNotificationIcon(type: string) {
     default:
       return <Sparkles className="h-4 w-4 text-primary shrink-0" />;
   }
-import { usePathname } from "next/navigation";
-import { resolveUserRole } from "@/lib/utils";
+}
 
 export function NotificationDropdown() {
   const pathname = usePathname();

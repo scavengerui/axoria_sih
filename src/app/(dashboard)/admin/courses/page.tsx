@@ -63,7 +63,7 @@ function CourseApprovalCard({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="warning" className="text-[10px] bg-warning/15 text-warning border-warning/30">
+              <Badge variant="secondary" className="text-[10px] bg-warning/15 text-warning border-warning/30">
                 Pending Approval
               </Badge>
               {course.competencyTags?.map((tag: string) => (
@@ -104,7 +104,7 @@ function CourseApprovalCard({
               <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                   <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="warning" className="text-[10px]">
+                    <Badge variant="secondary" className="text-[10px] bg-warning/15 text-warning border-warning/30">
                       Pending Verification
                     </Badge>
                     {course.competencyTags?.map((tag: string) => (
