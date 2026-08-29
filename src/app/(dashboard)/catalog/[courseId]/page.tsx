@@ -50,9 +50,12 @@ export default function CourseDetailPage({
 }) {
   const resolvedParams = use(params);
   const courseId = resolvedParams.courseId || "1";
+  const isStandardId = courseId === "1" || courseId === "2" || courseId === "3";
 
-  const [course, setCourse] = useState<CourseDetail>(() => getCourseDetailById(courseId));
-  const [loading, setLoading] = useState(true);
+  const [course, setCourse] = useState<CourseDetail | null>(() =>
+    isStandardId ? getCourseDetailById(courseId) : null
+  );
+  const [loading, setLoading] = useState(!isStandardId);
 
   const { membership } = useOrganization();
   const role = membership?.role ?? "org:admin";
@@ -140,6 +143,31 @@ export default function CourseDetailPage({
     }
     loadCourse();
   }, [courseId]);
+
+  if (loading || !course) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6 pb-16">
+        <Link
+          href="/catalog"
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Catalog
+        </Link>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-10 w-3/4" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-64 w-full rounded-xl" />
+          </div>
+          <div className="space-y-6">
+            <Skeleton className="h-80 w-full rounded-2xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const totalLessons = course.modules.reduce(
     (acc, m) => acc + m.lessons.length,
