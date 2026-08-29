@@ -69,9 +69,9 @@ export async function getCourses(filters?: {
     await connectToDatabase();
 
     const query: any = {};
-    if (filters?.status) {
+    if (filters?.status && filters.status !== "all") {
       query.status = filters.status;
-    } else {
+    } else if (!filters?.status) {
       query.status = "published";
     }
 
