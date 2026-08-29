@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { createNotification } from "@/lib/actions/notification";
+import { joinAxoriaEnterpriseOrg } from "@/lib/actions/users";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -78,11 +79,17 @@ export default function OnboardingPage() {
 
     setIsJoining(true);
     try {
-      // 1. Set Axoria as the Active Organization
-      if (userMemberships?.data && setActive) {
-        const axoriaOrg = userMemberships.data.find(
-          (m) =>
-            m.organization.name.toLowerCase().includes("axoria")
+      // 1. Permanently join Axoria via Clerk Backend Admin API
+      const joinRes = await joinAxoriaEnterpriseOrg({
+        role: selectedRole,
+        department: selectedDepartment,
+      });
+
+      if (joinRes.success && setActive && joinRes.orgId) {
+        await setActive({ organization: joinRes.orgId });
+      } else if (userMemberships?.data && setActive) {
+        const axoriaOrg = userMemberships.data.find((m) =>
+          m.organization.name.toLowerCase().includes("axoria")
         );
         if (axoriaOrg) {
           await setActive({ organization: axoriaOrg.organization.id });

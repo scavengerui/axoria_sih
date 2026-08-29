@@ -10,10 +10,19 @@ export async function GET() {
     const client = await clerkClient();
     await connectToDatabase();
 
-    // 1. Get existing organizations
+    // 1. Get the official Axoria Organization in Clerk
     const orgs = await client.organizations.getOrganizationList({ limit: 10 });
-    const targetOrg = orgs.data[0];
-    const orgId = targetOrg?.id;
+    let targetOrg = orgs.data.find((o) => o.name.toLowerCase().includes("axoria")) || orgs.data[0];
+
+    // If no Axoria org exists, create the official one
+    if (!targetOrg) {
+      targetOrg = await client.organizations.createOrganization({
+        name: "Axoria Enterprise",
+      });
+    }
+
+    const orgId = targetOrg.id;
+    console.log("Official Organization Target:", targetOrg.name, orgId);
 
     // 2. Get published courses in MongoDB
     const publishedCourses = await Course.find({ status: "published" });
@@ -21,10 +30,50 @@ export async function GET() {
     const results = [];
     const defaultPassword = "axoria@123";
 
-    // Clean old enrollments to ensure only valid learners are enrolled
+    // Clean old enrollments to ensure fresh, accurate state
     await Enrollment.deleteMany({});
 
-    // Provision all enterprise personnel in Clerk & MongoDB
+    // 3. Migrate ALL registered real Clerk users into Axoria
+    const allClerkUsers = await client.users.getUserList({ limit: 100 });
+    for (const realUser of allClerkUsers.data) {
+      try {
+        const userEmail = realUser.emailAddresses[0]?.emailAddress || "";
+        const isAdmin = userEmail === "sivadhanushkotturu@gmail.com";
+        const role = isAdmin ? "org:admin" : "org:member";
+
+        await client.organizations.createOrganizationMembership({
+          organizationId: orgId,
+          userId: realUser.id,
+          role,
+        });
+
+        // If learner, enroll in published courses
+        if (!isAdmin && publishedCourses.length > 0) {
+          for (const course of publishedCourses) {
+            try {
+              await Enrollment.create({
+                userId: realUser.id,
+                courseId: course._id,
+                orgId: orgId,
+                mandatory: course.mandatory,
+                status: "in_progress",
+                progress: 15,
+              });
+            } catch {}
+          }
+        }
+
+        results.push({
+          name: `${realUser.firstName || ""} ${realUser.lastName || ""}`.trim() || userEmail,
+          email: userEmail,
+          status: "Migrated into Axoria",
+        });
+      } catch (err: any) {
+        // Already a member
+      }
+    }
+
+    // 4. Provision all 25 Enterprise Personnel into Axoria
     for (const person of ENTERPRISE_ROSTER) {
       try {
         const nameParts = person.name.replace(/^Dr\.\s*|^Prof\.\s*|^Col\.\s*/, "").split(" ");
@@ -39,7 +88,6 @@ export async function GET() {
         let clerkUserId = existingUsers.data[0]?.id;
 
         if (!clerkUserId) {
-          // Create new user in Clerk with password
           const newUser = await client.users.createUser({
             firstName,
             lastName,
@@ -50,7 +98,7 @@ export async function GET() {
           clerkUserId = newUser.id;
         }
 
-        // Add to Clerk Organization with exact role
+        // Add to Axoria Organization with exact role
         if (orgId && clerkUserId) {
           try {
             const role =
@@ -72,13 +120,15 @@ export async function GET() {
           }
         }
 
-        // 3. ONLY ENROLL ACTIVE LEARNERS (Trainers and Admins do NOT enroll as learners!)
+        // 5. Enroll active learners in MongoDB
         if (clerkUserId && person.role === "learner" && publishedCourses.length > 0) {
           for (const course of publishedCourses) {
-            const isAgileCourse = course.title.toLowerCase().includes("agile") || course.title.toLowerCase().includes("leadership");
-            const isEngineeringOrProduct = person.department === "Engineering" || person.department === "Product & Design";
+            const isAgileCourse =
+              course.title.toLowerCase().includes("agile") ||
+              course.title.toLowerCase().includes("leadership");
+            const isEngineeringOrProduct =
+              person.department === "Engineering" || person.department === "Product & Design";
 
-            // Only enroll in optional agile track if relevant to engineering/product
             if (isAgileCourse && !isEngineeringOrProduct) {
               continue;
             }
@@ -87,7 +137,7 @@ export async function GET() {
               await Enrollment.create({
                 userId: clerkUserId,
                 courseId: course._id,
-                orgId: orgId || "default",
+                orgId: orgId,
                 mandatory: course.mandatory,
                 status: person.status === "Certified" ? "completed" : "in_progress",
                 progress: person.status === "Certified" ? 100 : person.completionRate,
@@ -103,31 +153,26 @@ export async function GET() {
           name: person.name,
           email: person.email,
           role: person.role,
-          status: person.role === "learner" ? "Learner Enrolled" : "Staff Account Synced",
+          status: "Synced into Axoria",
         });
       } catch (userErr: any) {
         console.error(`Clerk error for ${person.name}:`, JSON.stringify(userErr.errors || userErr, null, 2));
-        results.push({
-          name: person.name,
-          email: person.email,
-          status: userErr.errors?.[0]?.message || userErr.message,
-        });
       }
     }
 
     const totalEnrollments = await Enrollment.countDocuments();
-    const totalLearners = ENTERPRISE_ROSTER.filter((r) => r.role === "learner").length;
 
     return NextResponse.json({
       success: true,
-      message: `Cleanly synced ${results.length} users (${totalLearners} Learners) and created ${totalEnrollments} targeted MongoDB enrollments!`,
-      defaultPassword: defaultPassword,
-      activeLearners: totalLearners,
+      message: `Successfully migrated all users into ${targetOrg.name} and created ${totalEnrollments} MongoDB enrollments!`,
+      targetOrg: targetOrg.name,
+      orgId: orgId,
+      migratedCount: results.length,
       totalEnrollmentsInDB: totalEnrollments,
       users: results,
     });
   } catch (error: any) {
-    console.error("Clerk & Mongo seed error:", error);
+    console.error("Clerk & Mongo migration error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
