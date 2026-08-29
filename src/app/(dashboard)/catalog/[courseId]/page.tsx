@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import { useOrganization } from "@clerk/nextjs";
 import {
@@ -14,10 +14,13 @@ import {
   Award,
   ChevronRight,
   ShieldCheck,
+  Play,
+  Layers,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Accordion,
   AccordionContent,
@@ -25,7 +28,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
-import { getCourseDetailById } from "@/lib/data/courseCatalogData";
+import { getCourseDetailById, CourseDetail } from "@/lib/data/courseCatalogData";
+import { getCourseById } from "@/lib/actions/course";
 
 function getLessonIcon(type: string) {
   switch (type) {
@@ -46,11 +50,96 @@ export default function CourseDetailPage({
 }) {
   const resolvedParams = use(params);
   const courseId = resolvedParams.courseId || "1";
-  const course = getCourseDetailById(courseId);
+
+  const [course, setCourse] = useState<CourseDetail>(() => getCourseDetailById(courseId));
+  const [loading, setLoading] = useState(true);
 
   const { membership } = useOrganization();
   const role = membership?.role ?? "org:admin";
   const isLearner = role === "org:member";
+
+  useEffect(() => {
+    async function loadCourse() {
+      try {
+        if (courseId.length > 5) {
+          const res = await getCourseById(courseId);
+          if (res.success && res.course) {
+            const c = res.course;
+            const isAgile = c.title.toLowerCase().includes("agile");
+            const isPrivacy = c.title.toLowerCase().includes("privacy");
+
+            const customDetail: CourseDetail = {
+              id: c._id,
+              title: c.title,
+              description: c.description,
+              instructor: {
+                name: isAgile
+                  ? "Prof. Sunita Deshmukh"
+                  : isPrivacy
+                    ? "Dr. Ananya Sengupta"
+                    : c.instructor || "Dr. Raghavan Sundaram (CISO)",
+                role: "Senior Enterprise Instructor",
+                avatar: "IN",
+              },
+              stats: {
+                duration: `${c.estimatedDuration || 40}m`,
+                enrolled: c.enrolledCount || 1,
+                rating: 4.9,
+              },
+              tags: c.competencyTags || ["Enterprise", "Compliance"],
+              isMandatory: c.mandatory || false,
+              modules:
+                c.modules && c.modules.length > 0
+                  ? c.modules.map((m: any, idx: number) => ({
+                      id: m._id || `m_${idx}`,
+                      title: m.title,
+                      lessons: (m.lessons || []).map((l: any, lIdx: number) => ({
+                        id: l._id || `l_${idx}_${lIdx}`,
+                        title: l.title,
+                        type: l.type || "video",
+                        duration: `${l.duration || 10}m`,
+                        hasQuiz: !!l.quizId,
+                      })),
+                    }))
+                  : [
+                      {
+                        id: "m_def",
+                        title: "Module 1: Core Principles & Practical Application",
+                        lessons: [
+                          {
+                            id: "l_def_1",
+                            title: "Introduction & Operational Guidelines",
+                            type: "video",
+                            duration: "15m",
+                          },
+                          {
+                            id: "l_def_2",
+                            title: "Practical Scenario & Assessment",
+                            type: "article",
+                            duration: "10m",
+                            hasQuiz: true,
+                          },
+                        ],
+                      },
+                    ],
+              quiz: {
+                title: `${c.title} Assessment`,
+                questions: [],
+              },
+            };
+            setCourse(customDetail);
+          }
+        } else {
+          setCourse(getCourseDetailById(courseId));
+        }
+      } catch (err) {
+        console.error("Failed to load course details:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadCourse();
+  }, [courseId]);
 
   const totalLessons = course.modules.reduce(
     (acc, m) => acc + m.lessons.length,
@@ -132,40 +221,43 @@ export default function CourseDetailPage({
               </span>
             </div>
 
-            <Accordion defaultValue={["m1", "m2"]} className="space-y-3">
-              {course.modules.map((module, index) => (
+            <Accordion defaultValue={["module-0"]} className="space-y-3">
+              {course.modules.map((module, modIdx) => (
                 <AccordionItem
                   key={module.id}
-                  value={module.id}
-                  className="border border-border rounded-xl px-4 bg-muted/10"
+                  value={`module-${modIdx}`}
+                  className="border border-border rounded-xl px-4 overflow-hidden"
                 >
                   <AccordionTrigger className="hover:no-underline py-3.5">
-                    <div className="flex items-center gap-3 text-left">
-                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">
-                        {index + 1}
+                    <div className="flex items-center justify-between w-full pr-4 text-left">
+                      <span className="text-sm font-semibold text-foreground">
+                        {module.title}
                       </span>
-                      <span className="font-semibold text-sm">{module.title}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {module.lessons.length} lessons
+                      </span>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="pt-1 pb-3 space-y-2">
-                    {module.lessons.map((lesson) => (
-                      <div
-                        key={lesson.id}
-                        className="flex items-center justify-between p-2.5 rounded-lg bg-background border border-border/50 hover:bg-muted/40 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          {getLessonIcon(lesson.type)}
-                          <span className="text-xs font-medium text-foreground">
-                            {lesson.title}
-                          </span>
+                  <AccordionContent className="pb-3 pt-1">
+                    <div className="space-y-1">
+                      {module.lessons.map((lesson) => (
+                        <div
+                          key={lesson.id}
+                          className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors text-xs"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            {getLessonIcon(lesson.type)}
+                            <span className="text-foreground">{lesson.title}</span>
+                            {lesson.hasQuiz && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                Quiz
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="text-muted-foreground">{lesson.duration}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-muted-foreground">
-                            {lesson.duration}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               ))}
@@ -175,49 +267,64 @@ export default function CourseDetailPage({
 
         {/* Sidebar (Right 1/3) */}
         <div className="space-y-6">
-          <Card className="border-border shadow-sm sticky top-6">
-            <CardContent className="p-6 space-y-6">
-              <Link href={`/learn/${course.id}`} className="block">
-                <Button className="w-full h-11 text-sm font-semibold gap-2">
-                  <BookOpen className="h-4 w-4" /> Start Learning Now
-                </Button>
-              </Link>
+          <Card className="border border-border shadow-sm sticky top-6">
+            <CardContent className="p-6 space-y-5">
+              <div className="space-y-2">
+                <Link href={`/learn/${courseId}`} className="block">
+                  <Button className="w-full text-xs h-10 font-semibold gap-2">
+                    Enter Course Player <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <p className="text-[11px] text-center text-muted-foreground">
+                  Free enterprise enrollment included with your organization account
+                </p>
+              </div>
 
+              <Separator />
+
+              {/* Quick Details */}
               <div className="space-y-3 text-xs">
-                <p className="font-bold text-foreground">Course Overview Includes:</p>
+                <h3 className="font-semibold text-foreground text-xs uppercase tracking-wider">
+                  Course Includes
+                </h3>
                 <div className="space-y-2 text-muted-foreground">
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-2">
-                      <Clock className="h-3.5 w-3.5" /> Total Duration
+                      <Clock className="h-3.5 w-3.5 text-primary" /> Duration
                     </span>
                     <span className="font-medium text-foreground">{course.stats.duration}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-2">
-                      <BookOpen className="h-3.5 w-3.5" /> Lessons
+                      <BookOpen className="h-3.5 w-3.5 text-primary" /> Total Lessons
                     </span>
-                    <span className="font-medium text-foreground">{totalLessons} lessons</span>
+                    <span className="font-medium text-foreground">{totalLessons} Lessons</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-2">
-                      <Award className="h-3.5 w-3.5" /> Official Certificate
+                      <Award className="h-3.5 w-3.5 text-success" /> Verified Certificate
                     </span>
-                    <Badge variant="secondary" className="text-[10px] text-success bg-success/10">
-                      Included
-                    </Badge>
+                    <span className="font-medium text-success">Yes, upon completion</span>
                   </div>
                 </div>
               </div>
 
               <Separator />
 
-              <div className="p-3 bg-muted/40 rounded-xl space-y-1 text-xs">
-                <p className="font-semibold text-foreground flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-primary" /> Verified Curriculum
+              {/* Instructor Card */}
+              <div className="p-3 bg-muted/40 rounded-xl space-y-2 text-xs">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                  Instructor
                 </p>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Accredited by Axoria Enterprise Learning Framework with real-time AI comprehension assessments.
-                </p>
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-xs">
+                    {course.instructor.avatar}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-foreground">{course.instructor.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{course.instructor.role}</p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

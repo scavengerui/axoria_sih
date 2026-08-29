@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import {
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { updateLessonProgress } from "@/lib/actions/enrollment";
 import { createNotification } from "@/lib/actions/notification";
+import { getCourseById } from "@/lib/actions/course";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getCourseDetailById, CourseDetail } from "@/lib/data/courseCatalogData";
@@ -57,9 +58,119 @@ export default function CoursePlayerPage({
 }) {
   const resolvedParams = use(params);
   const courseId = resolvedParams.courseId || "1";
-  const course: CourseDetail = getCourseDetailById(courseId);
 
+  const [course, setCourse] = useState<CourseDetail>(() => getCourseDetailById(courseId));
   const { user } = useUser();
+
+  useEffect(() => {
+    async function loadCourse() {
+      if (courseId.length > 5) {
+        const res = await getCourseById(courseId);
+        if (res.success && res.course) {
+          const c = res.course;
+          const isAgile = c.title.toLowerCase().includes("agile");
+          const isPrivacy = c.title.toLowerCase().includes("privacy");
+
+          const customDetail: CourseDetail = {
+            id: c._id,
+            title: c.title,
+            description: c.description,
+            instructor: {
+              name: isAgile
+                ? "Prof. Sunita Deshmukh"
+                : isPrivacy
+                  ? "Dr. Ananya Sengupta"
+                  : c.instructor || "Dr. Raghavan Sundaram (CISO)",
+              role: "Senior Enterprise Instructor",
+              avatar: "IN",
+            },
+            stats: {
+              duration: `${c.estimatedDuration || 40}m`,
+              enrolled: c.enrolledCount || 1,
+              rating: 4.9,
+            },
+            tags: c.competencyTags || ["Enterprise", "Security"],
+            isMandatory: c.mandatory || false,
+            modules:
+              c.modules && c.modules.length > 0
+                ? c.modules.map((m: any, idx: number) => ({
+                    id: m._id || `m_${idx}`,
+                    title: m.title,
+                    lessons: (m.lessons || []).map((l: any, lIdx: number) => ({
+                      id: l._id || `l_${idx}_${lIdx}`,
+                      title: l.title,
+                      type: l.type || "video",
+                      duration: `${l.duration || 10}m`,
+                      videoUrl: l.contentUrl || "https://www.youtube.com/embed/j0ieRrwae5w",
+                      articleContent:
+                        l.content ||
+                        "Organizational compliance requires continuous learning, regular self-assessments, and cross-team communication.",
+                      hasQuiz: true,
+                    })),
+                  }))
+                : [
+                    {
+                      id: "m_def",
+                      title: "Module 1: Foundations & Core Principles",
+                      lessons: [
+                        {
+                          id: "l_def_1",
+                          title: "Introduction & Strategy Overview",
+                          type: "video",
+                          duration: "15m",
+                          videoUrl: "https://www.youtube.com/embed/j0ieRrwae5w",
+                        },
+                        {
+                          id: "l_def_2",
+                          title: "Key Framework Guidelines",
+                          type: "article",
+                          duration: "10m",
+                          articleContent:
+                            "Organizational compliance requires continuous learning, regular self-assessments, and cross-team communication.",
+                          hasQuiz: true,
+                        },
+                      ],
+                    },
+                  ],
+            quiz: {
+              title: `${c.title} Assessment`,
+              questions: [
+                {
+                  id: "q_cust_1",
+                  text: `What is the primary compliance principle taught in ${c.title}?`,
+                  options: [
+                    "Continuous learning, verification, and proactive security hygiene",
+                    "Ignoring security policies unless an audit is announced",
+                    "Sharing administrative credentials across departments",
+                    "Disabling multifactor authentication for faster login",
+                  ],
+                  correctIndex: 0,
+                  explanation:
+                    "Proactive compliance and continuous verification form the core foundation of organizational capability.",
+                },
+                {
+                  id: "q_cust_2",
+                  text: "Why is browser extension permission scoping critical for organizational defense?",
+                  options: [
+                    "Extensions with broad permissions can read and exfiltrate sensitive session tokens and credentials",
+                    "Extensions use too much disk space on local SSDs",
+                    "Extensions change the browser theme colors unexpectedly",
+                    "Extensions disable monitor brightness settings",
+                  ],
+                  correctIndex: 0,
+                  explanation:
+                    "Malicious or over-privileged browser extensions can capture keystrokes and session cookies, bypassing standard per-request firewall inspection.",
+                },
+              ],
+            },
+          };
+          setCourse(customDetail);
+        }
+      }
+    }
+    loadCourse();
+  }, [courseId]);
+
   const flatLessons = course.modules.flatMap((m) => m.lessons);
 
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
@@ -76,9 +187,9 @@ export default function CoursePlayerPage({
 
   const currentLesson = flatLessons[currentLessonIndex] || flatLessons[0];
   const progressPercent = Math.round(
-    (completedLessons.size / flatLessons.length) * 100
+    (completedLessons.size / Math.max(1, flatLessons.length)) * 100
   );
-  const isCompleted = completedLessons.has(currentLesson.id);
+  const isCompleted = completedLessons.has(currentLesson?.id);
 
   const handleNext = () => {
     if (currentLessonIndex < flatLessons.length - 1) {
@@ -113,30 +224,42 @@ export default function CoursePlayerPage({
       }
     }
 
+    if (user?.id) {
+      try {
+        await updateLessonProgress({
+          userId: user.id,
+          courseId: course.id,
+          lessonId: currentLesson.id,
+          totalLessons: flatLessons.length,
+        });
+      } catch (err) {
+        console.error("Progress sync notice:", err);
+      }
+    }
+
     handleNext();
   };
 
-  const handleAnswerSelect = (questionId: string, optionIndex: number) => {
+  const handleQuizAnswer = (qId: string, optIdx: number) => {
     if (quizSubmitted) return;
-    setSelectedAnswers((prev) => ({ ...prev, [questionId]: optionIndex }));
+    setSelectedAnswers((prev) => ({ ...prev, [qId]: optIdx }));
   };
 
-  const handleSubmitQuiz = async () => {
-    const questions = course.quiz.questions;
-    let correctCount = 0;
-
+  const handleQuizSubmit = async () => {
+    let correct = 0;
+    const questions = course.quiz?.questions || [];
     questions.forEach((q) => {
       if (selectedAnswers[q.id] === q.correctIndex) {
-        correctCount += 1;
+        correct++;
       }
     });
 
-    const scorePct = Math.round((correctCount / questions.length) * 100);
-    setQuizScore(scorePct);
+    const score = Math.round((correct / Math.max(1, questions.length)) * 100);
+    setQuizScore(score);
     setQuizSubmitted(true);
 
-    if (scorePct >= 70) {
-      toast.success(`Passed Assessment with ${scorePct}%! 🏆`);
+    if (score >= 70) {
+      toast.success(`Assessment Passed with ${score}%! 🏆`);
       const nextSet = new Set(completedLessons);
       nextSet.add(currentLesson.id);
       setCompletedLessons(nextSet);
@@ -145,359 +268,391 @@ export default function CoursePlayerPage({
         await createNotification({
           userId: user.id,
           type: "certificate",
-          title: `Assessment Passed (${scorePct}%)! 🎓`,
-          message: `Passed ${course.quiz.title}. Certificate credential is ready!`,
+          title: `Assessment Passed: ${course.title}`,
+          message: `Score: ${score}%. Certificate #${course.id} issued.`,
           link: "/certificates",
         });
       }
     } else {
-      toast.error(`Scored ${scorePct}%. Retake required (pass threshold is 70%).`);
+      toast.error(`Score: ${score}%. Minimum passing threshold is 70%.`);
     }
   };
 
-  const handleResetQuiz = () => {
+  const handleQuizReset = () => {
     setSelectedAnswers({});
     setQuizSubmitted(false);
     setQuizScore(0);
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] max-w-7xl mx-auto">
-      {/* Top Banner Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card/60 backdrop-blur shrink-0">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/catalog"
-            className="p-1.5 rounded-lg hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <div>
-            <h1 className="font-semibold text-xs sm:text-sm text-foreground line-clamp-1">
-              {course.title}
-            </h1>
-            <p className="text-[11px] text-muted-foreground flex items-center gap-2">
-              <span>{course.instructor.name}</span>
-              <span>•</span>
-              <span>Lesson {currentLessonIndex + 1} of {flatLessons.length}</span>
-            </p>
+    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-background">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col overflow-y-auto">
+        {/* Top Control Bar */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/catalog/${courseId}`}
+              className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to Course
+            </Link>
+            <Separator orientation="vertical" className="h-4" />
+            <h2 className="text-xs sm:text-sm font-semibold text-foreground truncate max-w-md">
+              {currentLesson?.title || "Lesson"}
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="md:hidden text-xs h-8"
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="hidden sm:flex items-center gap-2.5">
-            <span className="text-xs font-semibold text-foreground">
-              {progressPercent}% Complete
-            </span>
-            <Progress value={progressPercent} className="w-28 h-2" />
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="md:hidden text-xs h-8"
-          >
-            <Menu className="h-4 w-4 mr-1" /> Syllabus
-          </Button>
-        </div>
-      </div>
-
-      {/* Main Learning Surface */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Content Viewer Area */}
-        <div className="flex-1 flex flex-col overflow-y-auto p-4 sm:p-6 bg-background">
-          <div className="max-w-4xl mx-auto w-full space-y-6">
-            {/* Lesson Title & Type Badge */}
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-[10px] capitalize">
-                    {currentLesson.type} Lesson
-                  </Badge>
-                  {isCompleted && (
-                    <Badge variant="outline" className="text-success border-success/30 text-[10px] gap-1">
-                      <Check className="h-3 w-3" /> Completed
-                    </Badge>
-                  )}
-                </div>
-                <h2 className="text-xl font-bold text-foreground">
-                  {currentLesson.title}
-                </h2>
-              </div>
-
-              {/* Assessment Trigger Button */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setQuizOpen(true)}
-                className="gap-1.5 text-xs border-primary/40 text-primary hover:bg-primary/5"
-              >
-                <HelpCircle className="h-3.5 w-3.5" /> Take Quiz
-              </Button>
-            </div>
-
-            {/* VIDEO LESSON VIEWER */}
-            {currentLesson.type === "video" && (
-              <div className="rounded-2xl overflow-hidden aspect-video bg-black shadow-md border border-border">
+        {/* Lesson Viewer Content */}
+        <div className="p-6 md:p-8 max-w-4xl mx-auto w-full space-y-6 flex-1">
+          {/* VIDEO LESSON */}
+          {currentLesson?.type === "video" && (
+            <div className="space-y-4">
+              <div className="relative aspect-video rounded-2xl overflow-hidden bg-black shadow-lg border border-border">
                 <iframe
-                  src={currentLesson.videoUrl || "https://www.youtube.com/embed/bPVaOlJ6ln0"}
+                  src={currentLesson.videoUrl || "https://www.youtube.com/embed/j0ieRrwae5w"}
                   title={currentLesson.title}
-                  className="w-full h-full"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
+                  className="w-full h-full border-0"
                 />
               </div>
-            )}
 
-            {/* ARTICLE LESSON VIEWER */}
-            {currentLesson.type === "article" && (
-              <div className="p-6 rounded-2xl border border-border bg-card shadow-xs space-y-4">
-                <div className="prose prose-sm dark:prose-invert max-w-none text-foreground leading-relaxed whitespace-pre-line text-sm">
+              <div className="flex items-center justify-between pt-2">
+                <div>
+                  <h1 className="text-xl font-bold text-foreground">{currentLesson.title}</h1>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Module Duration: {currentLesson.duration} • Interactive Video Lecture
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ARTICLE LESSON */}
+          {currentLesson?.type === "article" && (
+            <div className="space-y-6">
+              <div className="border-b border-border pb-4">
+                <Badge variant="secondary" className="text-xs mb-2">
+                  Compliance Reading
+                </Badge>
+                <h1 className="text-2xl font-bold text-foreground">{currentLesson.title}</h1>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Estimated reading time: {currentLesson.duration}
+                </p>
+              </div>
+
+              <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground leading-relaxed space-y-4">
+                <div className="p-4 bg-muted/40 rounded-xl border border-border/70 text-foreground font-medium text-xs leading-relaxed">
                   {currentLesson.articleContent ||
-                    "Review key notes and organizational standards for this module."}
+                    "Organizational compliance requires continuous learning, regular self-assessments, and cross-team communication."}
                 </div>
-              </div>
-            )}
 
-            {/* PDF DOCUMENT VIEWER */}
-            {currentLesson.type === "pdf" && (
-              <div className="p-6 rounded-2xl border border-border bg-card shadow-xs space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 border border-border/50">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-8 w-8 text-primary" />
-                    <div>
-                      <p className="font-semibold text-xs text-foreground">
-                        {currentLesson.title}.pdf
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        Enterprise Operational Policy & Reference Sheet
-                      </p>
-                    </div>
-                  </div>
-                  <a
-                    href={currentLesson.pdfUrl || "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-primary font-medium hover:underline"
-                  >
-                    Open Full PDF <ExternalLink className="h-3 w-3" />
-                  </a>
+                <h3 className="text-base font-semibold text-foreground pt-2">
+                  Key Operational Guidelines
+                </h3>
+                <ul className="list-disc pl-5 space-y-2 text-xs">
+                  <li>Always verify permissions requested by third-party tooling and browser add-ons.</li>
+                  <li>Ensure multi-factor authentication (MFA) is actively enforced across all team logins.</li>
+                  <li>Report any suspicious access or token anomalies to the enterprise security team.</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* PDF LESSON */}
+          {currentLesson?.type === "pdf" && (
+            <div className="space-y-4">
+              <div className="p-8 border-2 border-dashed border-border rounded-2xl bg-muted/20 text-center space-y-4">
+                <FileText className="h-12 w-12 text-primary mx-auto" />
+                <div>
+                  <h3 className="font-semibold text-base text-foreground">
+                    {currentLesson.title}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Official Documentation & Governance Framework
+                  </p>
                 </div>
+                <Button variant="outline" size="sm" className="gap-2 text-xs">
+                  <ExternalLink className="h-3.5 w-3.5" /> Download / Open Document
+                </Button>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Bottom Controls */}
-            <div className="flex items-center justify-between pt-6 border-t border-border mt-8">
+          {/* Lesson Action Footer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border mt-8">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handlePrev}
                 disabled={currentLessonIndex === 0}
-                className="gap-1 text-xs"
+                className="gap-1.5 text-xs h-9"
               >
                 <ChevronLeft className="h-4 w-4" /> Previous
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNext}
+                disabled={currentLessonIndex === flatLessons.length - 1}
+                className="gap-1.5 text-xs h-9"
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
 
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              {currentLesson?.hasQuiz && (
                 <Button
+                  variant="secondary"
                   size="sm"
-                  onClick={handleMarkComplete}
-                  className="gap-1.5 text-xs"
+                  onClick={() => {
+                    handleQuizReset();
+                    setQuizOpen(true);
+                  }}
+                  className="gap-2 text-xs h-9 font-semibold bg-primary/10 text-primary hover:bg-primary/20"
                 >
-                  <Check className="h-3.5 w-3.5" />
-                  {isCompleted ? "Completed (Next)" : "Mark as Complete"}
+                  <Sparkles className="h-4 w-4 text-primary" /> Take AI Assessment
                 </Button>
+              )}
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleNext}
-                  disabled={currentLessonIndex === flatLessons.length - 1}
-                  className="gap-1 text-xs"
-                >
-                  Next <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                onClick={handleMarkComplete}
+                className={cn(
+                  "gap-2 text-xs h-9 font-semibold",
+                  isCompleted ? "bg-success text-white hover:bg-success/90" : "bg-primary"
+                )}
+              >
+                <Check className="h-4 w-4" />
+                {isCompleted ? "Completed" : "Mark as Complete"}
+              </Button>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Right: Interactive Syllabus Sidebar */}
-        <div
-          className={cn(
-            "w-80 border-l border-border bg-card shrink-0 flex flex-col md:flex",
-            sidebarOpen ? "fixed inset-y-0 right-0 z-50 shadow-2xl" : "hidden md:flex"
-          )}
-        >
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <h3 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
-              Course Syllabus
+      {/* Right Lesson Sidebar */}
+      <div
+        className={cn(
+          "w-80 border-l border-border bg-card flex flex-col transition-all duration-300",
+          sidebarOpen ? "block fixed inset-y-0 right-0 z-50 shadow-2xl" : "hidden md:flex"
+        )}
+      >
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-border space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-sm text-foreground truncate pr-2">
+              {course.title}
             </h3>
-            <span className="text-xs text-primary font-bold">
-              {completedLessons.size}/{flatLessons.length} Done
-            </span>
+            {sidebarOpen && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(false)}
+                className="h-7 w-7 md:hidden"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
 
-          <ScrollArea className="flex-1 p-3 space-y-4">
-            {course.modules.map((module) => (
-              <div key={module.id} className="space-y-1.5 mb-4">
-                <p className="text-xs font-bold text-foreground px-2 py-1 flex items-center gap-1.5">
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Overall Progress</span>
+              <span className="font-semibold text-foreground">{progressPercent}%</span>
+            </div>
+            <Progress value={progressPercent} className="h-1.5" />
+          </div>
+        </div>
+
+        {/* Scrollable Lesson List */}
+        <ScrollArea className="flex-1 p-3">
+          <div className="space-y-4">
+            {course.modules.map((module, modIdx) => (
+              <div key={module.id} className="space-y-1.5">
+                <p className="px-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                   {module.title}
                 </p>
+
                 <div className="space-y-1">
                   {module.lessons.map((lesson) => {
-                    const lIdx = flatLessons.findIndex((fl) => fl.id === lesson.id);
-                    const isCurrent = lIdx === currentLessonIndex;
+                    const lIndex = flatLessons.findIndex((l) => l.id === lesson.id);
+                    const isCurrent = lIndex === currentLessonIndex;
                     const isDone = completedLessons.has(lesson.id);
 
                     return (
-                      <div
+                      <button
                         key={lesson.id}
                         onClick={() => {
-                          setCurrentLessonIndex(lIdx);
-                          setSidebarOpen(false);
+                          setCurrentLessonIndex(lIndex);
+                          if (sidebarOpen) setSidebarOpen(false);
                         }}
                         className={cn(
-                          "flex items-center gap-2.5 p-2.5 rounded-xl text-xs cursor-pointer transition-all",
+                          "w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all text-xs",
                           isCurrent
-                            ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                            : "hover:bg-muted/50 text-foreground"
+                            ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                            : "hover:bg-muted text-muted-foreground hover:text-foreground"
                         )}
                       >
-                        <div className="shrink-0">
+                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
                           {isDone ? (
                             <CheckCircle2
                               className={cn(
-                                "h-4 w-4",
+                                "h-4 w-4 shrink-0",
                                 isCurrent ? "text-primary-foreground" : "text-success"
                               )}
                             />
                           ) : (
-                            getLessonIcon(lesson.type, "h-4 w-4 opacity-70")
+                            getLessonIcon(
+                              lesson.type,
+                              cn(
+                                "h-4 w-4 shrink-0",
+                                isCurrent ? "text-primary-foreground" : "text-muted-foreground"
+                              )
+                            )
                           )}
+                          <span className="truncate">{lesson.title}</span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="truncate text-xs">{lesson.title}</p>
-                          <span
-                            className={cn(
-                              "text-[10px]",
-                              isCurrent ? "text-primary-foreground/80" : "text-muted-foreground"
-                            )}
-                          >
-                            {lesson.duration}
-                          </span>
-                        </div>
-                      </div>
+
+                        <span
+                          className={cn(
+                            "text-[10px] font-mono shrink-0",
+                            isCurrent ? "text-primary-foreground/80" : "text-muted-foreground"
+                          )}
+                        >
+                          {lesson.duration}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
               </div>
             ))}
-          </ScrollArea>
-        </div>
+          </div>
+        </ScrollArea>
       </div>
 
-      {/* UNIQUE COURSE ASSESSMENT MODAL */}
+      {/* AI Assessment Quiz Modal */}
       <Dialog open={quizOpen} onOpenChange={setQuizOpen}>
-        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto p-6">
-          <DialogHeader className="border-b border-border pb-3">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-[10px]">
-                Knowledge Assessment
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="secondary" className="text-[10px] gap-1 bg-primary/10 text-primary">
+                <Sparkles className="w-3 h-3 text-primary" /> AI Assessment
               </Badge>
               <Badge variant="outline" className="text-[10px]">
-                Pass: 70%
+                Passing Score: 70%
               </Badge>
             </div>
-            <DialogTitle className="text-lg font-bold text-foreground mt-1">
-              {course.quiz.title}
-            </DialogTitle>
+            <DialogTitle className="text-lg font-bold">{course.quiz?.title || "Assessment"}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-5 pt-3">
-            {course.quiz.questions.map((q, qIndex) => {
-              const isSelected = selectedAnswers[q.id] !== undefined;
+          <div className="space-y-6 pt-3">
+            {course.quiz?.questions?.map((q, qIdx) => (
+              <div key={q.id} className="p-4 rounded-xl border border-border/80 bg-muted/20 space-y-3">
+                <p className="text-xs font-semibold text-foreground">
+                  {qIdx + 1}. {q.text}
+                </p>
 
-              return (
-                <div
-                  key={q.id}
-                  className="p-4 rounded-xl border border-border bg-muted/20 space-y-3"
-                >
-                  <p className="text-xs font-semibold text-foreground">
-                    {qIndex + 1}. {q.text}
-                  </p>
+                <div className="space-y-2">
+                  {q.options.map((opt, optIdx) => {
+                    const isSelected = selectedAnswers[q.id] === optIdx;
+                    const isCorrect = q.correctIndex === optIdx;
 
-                  <div className="space-y-2">
-                    {q.options.map((option, optIdx) => {
-                      const isChosen = selectedAnswers[q.id] === optIdx;
-                      const isCorrect = optIdx === q.correctIndex;
+                    let btnClass = "border-border hover:bg-muted text-foreground";
+                    if (quizSubmitted) {
+                      if (isCorrect) btnClass = "border-success bg-success/15 text-success font-semibold";
+                      else if (isSelected && !isCorrect)
+                        btnClass = "border-destructive bg-destructive/15 text-destructive font-semibold";
+                    } else if (isSelected) {
+                      btnClass = "border-primary bg-primary/10 text-primary font-semibold";
+                    }
 
-                      return (
-                        <div
-                          key={optIdx}
-                          onClick={() => handleAnswerSelect(q.id, optIdx)}
-                          className={cn(
-                            "flex items-center justify-between p-2.5 rounded-lg border text-xs cursor-pointer transition-all",
-                            !quizSubmitted && isChosen && "border-primary bg-primary/10 font-medium",
-                            !quizSubmitted && !isChosen && "border-border/60 bg-background hover:bg-muted/40",
-                            quizSubmitted && isCorrect && "border-success bg-success/15 font-semibold text-success",
-                            quizSubmitted && isChosen && !isCorrect && "border-destructive bg-destructive/15 text-destructive"
-                          )}
-                        >
-                          <span>{option}</span>
-                          {quizSubmitted && isCorrect && (
-                            <Check className="h-3.5 w-3.5 text-success shrink-0" />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {quizSubmitted && (
-                    <p className="text-[11px] text-muted-foreground/80 italic pt-1 border-t border-border/40">
-                      💡 {q.explanation}
-                    </p>
-                  )}
+                    return (
+                      <button
+                        key={optIdx}
+                        type="button"
+                        onClick={() => handleQuizAnswer(q.id, optIdx)}
+                        className={cn(
+                          "w-full text-left p-2.5 rounded-lg border text-xs transition-all flex items-center justify-between",
+                          btnClass
+                        )}
+                      >
+                        <span>{opt}</span>
+                        {quizSubmitted && isCorrect && (
+                          <Check className="h-3.5 w-3.5 text-success shrink-0" />
+                        )}
+                        {quizSubmitted && isSelected && !isCorrect && (
+                          <X className="h-3.5 w-3.5 text-destructive shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-border mt-4">
-            {quizSubmitted ? (
-              <div className="flex items-center justify-between w-full">
-                <span className="text-xs font-bold text-foreground">
-                  Score: {quizScore}% {quizScore >= 70 ? "🎉 (Passed)" : "❌ (Try Again)"}
+                {quizSubmitted && q.explanation && (
+                  <p className="text-[11px] text-muted-foreground p-2.5 bg-background rounded-lg border border-border/50">
+                    💡 <strong className="text-foreground">Explanation:</strong> {q.explanation}
+                  </p>
+                )}
+              </div>
+            ))}
+
+            {/* Quiz Footer */}
+            <div className="flex items-center justify-between pt-4 border-t border-border">
+              {quizSubmitted ? (
+                <div className="flex items-center gap-3">
+                  <Badge
+                    variant={quizScore >= 70 ? "secondary" : "destructive"}
+                    className={cn(
+                      "text-xs px-2.5 py-1",
+                      quizScore >= 70 && "bg-success/15 text-success border-success/30"
+                    )}
+                  >
+                    Your Score: {quizScore}% {quizScore >= 70 ? "🎉 Passed" : "⚠️ Try Again"}
+                  </Badge>
+                  <Button variant="outline" size="sm" onClick={handleQuizReset} className="text-xs h-8">
+                    <RefreshCw className="h-3 w-3 mr-1" /> Retake Quiz
+                  </Button>
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  Answer all questions and submit to validate competency.
                 </span>
-                <div className="flex gap-2">
+              )}
+
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setQuizOpen(false)} className="text-xs h-8">
+                  Close
+                </Button>
+                {!quizSubmitted && (
                   <Button
                     size="sm"
-                    variant="outline"
-                    onClick={handleResetQuiz}
-                    className="text-xs"
+                    onClick={handleQuizSubmit}
+                    disabled={Object.keys(selectedAnswers).length < (course.quiz?.questions?.length || 1)}
+                    className="text-xs h-8 font-semibold"
                   >
-                    Retake Quiz
+                    Submit Answers
                   </Button>
-                  <Button size="sm" onClick={() => setQuizOpen(false)} className="text-xs">
-                    Done
-                  </Button>
-                </div>
+                )}
               </div>
-            ) : (
-              <div className="flex justify-end gap-2 w-full">
-                <Button
-                  size="sm"
-                  onClick={handleSubmitQuiz}
-                  disabled={
-                    Object.keys(selectedAnswers).length < course.quiz.questions.length
-                  }
-                  className="text-xs"
-                >
-                  Submit Assessment
-                </Button>
-              </div>
-            )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
