@@ -47,7 +47,6 @@ STRICT DOMAIN SCOPE & GUARDRAILS:
 ROLE-SPECIFIC GUIDANCE:
 1. ALWAYS tailor your response to the user's role:
    - IF USER IS AN ADMIN (${role === "org:admin"}):
-     * If they ask about taking courses, completing quizzes, or earning certificates, clearly clarify that as an Administrator, their primary role is managing the organization, approving courses, and tracking compliance—not enrolling in courses. Then provide the step-by-step of how learners in their organization do it.
      * Highlight administrative actions: approving courses in [Course Approval](/admin/courses), managing members in [User Management](/admin/users), and viewing org health in [Analytics](/admin/analytics).
    - IF USER IS A MANAGER (${role === "org:manager"}):
      * Guide them on assigning mandatory courses in [Assign Training](/manager/assign) and monitoring compliance in [Team Dashboard](/manager/team).
@@ -59,6 +58,7 @@ ROLE-SPECIFIC GUIDANCE:
 2. CLICKABLE LINKS:
    - When referencing platform sections, ALWAYS format them as markdown links:
      - [Course Catalog](/catalog)
+     - [Synapse](/synapse)
      - [My Learning](/my-learning)
      - [Certificates](/certificates)
      - [User Management](/admin/users)
@@ -71,7 +71,6 @@ ROLE-SPECIFIC GUIDANCE:
 3. TONE:
    - Professional, concise, sharp, and enterprise-focused (2-3 short paragraphs max).`;
 
-  // Build full message thread for multi-turn conversational context
   const chatMessages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
     ...history.slice(-6).map((m) => ({
@@ -171,5 +170,138 @@ Rules:
     success: false,
     questions: [],
     error: "Failed to generate quiz. Please check Groq API key.",
+  };
+}
+
+// ==========================================
+// SYNAPSE: UNIVERSAL DOCUMENT INTELLIGENCE
+// ==========================================
+
+export async function analyzeDocumentWithSynapse(
+  documentTitle: string,
+  documentText: string
+) {
+  const groq = getGroqClient();
+
+  const systemPrompt = `You are Synapse, the advanced document intelligence engine of Axoria.
+Analyze the provided document text and generate a comprehensive learning bundle including:
+1. Executive Summary & Key Takeaways
+2. 5 Multiple-Choice Assessment Questions
+3. 5 Interactive Revision Flashcards
+
+Return ONLY a valid JSON object with this exact structure (NO extra prose, NO markdown backticks):
+{
+  "summary": "2-3 concise paragraphs summarizing the core principles and scope of the document.",
+  "keyTakeaways": [
+    "Takeaway 1 with key insight",
+    "Takeaway 2 with key insight",
+    "Takeaway 3 with key insight",
+    "Takeaway 4 with key insight"
+  ],
+  "quiz": [
+    {
+      "id": "q1",
+      "text": "Question testing comprehension?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctIndex": 0,
+      "explanation": "Why this answer is correct based on the document"
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "fc1",
+      "front": "Key Term or Conceptual Question",
+      "back": "Clear, concise definition or essential rule"
+    }
+  ]
+}
+
+Rules:
+- Exactly 5 quiz questions with 4 options each and correctIndex (0-3).
+- Exactly 5 flashcards with front and back.
+- Ground everything strictly in the provided document.`;
+
+  for (const model of FALLBACK_GROQ_MODELS) {
+    try {
+      const completion = await groq.chat.completions.create({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: `Document Title: ${documentTitle}\n\nDocument Content:\n${documentText.slice(0, 40000)}`,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 3500,
+      });
+
+      const raw = completion.choices[0]?.message?.content || "";
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.summary && parsed.quiz && parsed.flashcards) {
+          return {
+            success: true,
+            data: parsed,
+          };
+        }
+      }
+    } catch (err: any) {
+      console.warn(`Synapse analysis failed with ${model}:`, err.message);
+    }
+  }
+
+  return {
+    success: false,
+    error: "Failed to analyze document. Please ensure Groq API key is valid.",
+  };
+}
+
+export async function askSynapseDoubt(
+  documentTitle: string,
+  documentText: string,
+  question: string,
+  history: Array<{ role: "user" | "assistant"; content: string }> = []
+) {
+  const groq = getGroqClient();
+
+  const systemPrompt = `You are Synapse Assistant, an intelligent document analysis companion in Axoria.
+You are helping an employee/student understand this document: "${documentTitle}".
+Answer the user's doubt clearly, accurately, and concisely based strictly on the provided document text.
+If the answer cannot be found in the document, clarify that politely and give the closest relevant guidance.
+
+Keep responses sharp, structured (bullet points if helpful), and pedagogical.`;
+
+  const messages = [
+    { role: "system" as const, content: `${systemPrompt}\n\nDOCUMENT CONTENT:\n${documentText.slice(0, 35000)}` },
+    ...history.slice(-4).map((h) => ({
+      role: h.role as "user" | "assistant",
+      content: h.content,
+    })),
+    { role: "user" as const, content: question },
+  ];
+
+  for (const model of FALLBACK_GROQ_MODELS) {
+    try {
+      const completion = await groq.chat.completions.create({
+        model,
+        messages,
+        temperature: 0.4,
+        max_tokens: 800,
+      });
+
+      const responseText = completion.choices[0]?.message?.content;
+      if (responseText) {
+        return { success: true, answer: responseText };
+      }
+    } catch (err: any) {
+      console.warn(`Synapse doubt failed with ${model}:`, err.message);
+    }
+  }
+
+  return {
+    success: false,
+    answer: "Unable to analyze document at this moment. Please check your connection.",
   };
 }

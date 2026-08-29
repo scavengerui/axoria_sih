@@ -18,6 +18,7 @@ import {
   Menu,
   Search,
   ChevronLeft,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ interface NavItem {
 const commonNavItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Course Catalog", href: "/catalog", icon: BookOpen },
+  { title: "Synapse", href: "/synapse", icon: Sparkles },
 ];
 
 const learnerNavItems: NavItem[] = [
