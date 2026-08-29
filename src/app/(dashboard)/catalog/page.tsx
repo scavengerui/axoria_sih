@@ -130,8 +130,8 @@ export default function CatalogPage() {
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
   const [customTopic, setCustomTopic] = useState("");
   const [difficulty, setDifficulty] = useState<"Beginner" | "Intermediate" | "Advanced">("Intermediate");
-  const [includeQuiz, setIncludeQuiz] = useState(true);
-  const [includeFlashcards, setIncludeFlashcards] = useState(true);
+  const [quizCount, setQuizCount] = useState(3);
+  const [flashcardCount, setFlashcardCount] = useState(4);
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
@@ -186,8 +186,8 @@ export default function CatalogPage() {
         userId: user.id,
         orgId: organization?.id || "axoria_enterprise",
         preferences: {
-          includeQuiz,
-          includeFlashcards,
+          quizCount,
+          flashcardCount,
           difficulty,
         },
       });
@@ -398,45 +398,7 @@ export default function CatalogPage() {
               </div>
             </div>
 
-            {/* Artifact Selection */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-foreground">
-                Include in Your Course:
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIncludeQuiz(!includeQuiz)}
-                  className={`p-3 rounded-xl border text-xs flex items-center justify-between transition-all ${
-                    includeQuiz
-                      ? "border-primary bg-primary/10 text-primary font-semibold"
-                      : "border-border text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4" /> AI Practice Quiz
-                  </span>
-                  {includeQuiz && <Check className="w-3.5 h-3.5" />}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIncludeFlashcards(!includeFlashcards)}
-                  className={`p-3 rounded-xl border text-xs flex items-center justify-between transition-all ${
-                    includeFlashcards
-                      ? "border-primary bg-primary/10 text-primary font-semibold"
-                      : "border-border text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <Layers className="w-4 h-4" /> Flashcards & Notes
-                  </span>
-                  {includeFlashcards && <Check className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Difficulty Level */}
+            {/* Target Difficulty Level */}
             <div className="space-y-2">
               <label className="text-xs font-semibold text-foreground">
                 Target Difficulty Level:
@@ -457,6 +419,60 @@ export default function CatalogPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Customization: Quiz & Flashcard Counts */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">
+                  Quiz Questions:
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[2, 3, 5].map((cnt) => (
+                    <button
+                      key={cnt}
+                      type="button"
+                      onClick={() => setQuizCount(cnt)}
+                      className={`py-1.5 rounded-lg border text-xs transition-all ${
+                        quizCount === cnt
+                          ? "border-primary bg-primary/10 text-primary font-bold"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {cnt} MCQs
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">
+                  Revision Flashcards:
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[3, 5, 8].map((cnt) => (
+                    <button
+                      key={cnt}
+                      type="button"
+                      onClick={() => setFlashcardCount(cnt)}
+                      className={`py-1.5 rounded-lg border text-xs transition-all ${
+                        flashcardCount === cnt
+                          ? "border-primary bg-primary/10 text-primary font-bold"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {cnt} Cards
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-muted/30 rounded-xl border border-border/60 text-[11px] text-muted-foreground flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary shrink-0" />
+              <span>
+                Generates visual process flowcharts and interactive in-lesson reflection checkpoints.
+              </span>
             </div>
 
             {/* Submit Actions */}

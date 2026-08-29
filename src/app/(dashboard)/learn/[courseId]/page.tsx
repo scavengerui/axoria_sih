@@ -4,9 +4,8 @@ import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import {
-  Play,
-  FileText,
   BookOpen,
+  FileText,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -20,36 +19,33 @@ import {
   ExternalLink,
   ShieldCheck,
   ArrowLeft,
+  Layers,
+  Send,
+  MessageSquare,
+  Compass,
+  Lightbulb,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { updateLessonProgress } from "@/lib/actions/enrollment";
 import { createNotification } from "@/lib/actions/notification";
 import { getCourseById } from "@/lib/actions/course";
+import { evaluateReflectionAnswer } from "@/lib/actions/ai";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getCourseDetailById, CourseDetail } from "@/lib/data/courseCatalogData";
-
-function getLessonIcon(type: string, className?: string) {
-  switch (type) {
-    case "video":
-      return <Play className={className} />;
-    case "pdf":
-      return <FileText className={className} />;
-    case "article":
-    default:
-      return <BookOpen className={className} />;
-  }
-}
 
 export default function CoursePlayerPage({
   params,
@@ -61,6 +57,27 @@ export default function CoursePlayerPage({
 
   const [course, setCourse] = useState<CourseDetail>(() => getCourseDetailById(courseId));
   const { user } = useUser();
+
+  // Navigation & Completion State (Starts strictly at 0%!)
+  const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
+  const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // In-Lesson Reflection Checkpoint State
+  const [reflectionInput, setReflectionInput] = useState("");
+  const [reflectionResult, setReflectionResult] = useState<any>(null);
+  const [isEvaluatingReflection, setIsEvaluatingReflection] = useState(false);
+
+  // Flashcards Study Modal State
+  const [flashcardsOpen, setFlashcardsOpen] = useState(false);
+  const [flashcardIndex, setFlashcardIndex] = useState(0);
+  const [isCardFlipped, setIsCardFlipped] = useState(false);
+
+  // AI Assessment Quiz Modal State
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizScore, setQuizScore] = useState(0);
 
   useEffect(() => {
     async function loadCourse() {
@@ -85,11 +102,11 @@ export default function CoursePlayerPage({
               avatar: "IN",
             },
             stats: {
-              duration: `${c.estimatedDuration || 40}m`,
+              duration: `${c.estimatedDuration || 35}m`,
               enrolled: c.enrolledCount || 1,
               rating: 4.9,
             },
-            tags: c.competencyTags || ["Enterprise", "Security"],
+            tags: c.competencyTags || ["Enterprise", "Specialized"],
             isMandatory: c.mandatory || false,
             modules:
               c.modules && c.modules.length > 0
@@ -99,12 +116,17 @@ export default function CoursePlayerPage({
                     lessons: (m.lessons || []).map((l: any, lIdx: number) => ({
                       id: l._id || `l_${idx}_${lIdx}`,
                       title: l.title,
-                      type: l.type || "video",
+                      type: "article",
                       duration: `${l.duration || 10}m`,
-                      videoUrl: l.contentUrl || "https://www.youtube.com/embed/j0ieRrwae5w",
                       articleContent:
                         l.content ||
-                        "Organizational compliance requires continuous learning, regular self-assessments, and cross-team communication.",
+                        "Comprehensive structured learning on core fundamentals and operational guidelines.",
+                      diagram:
+                        l.diagram ||
+                        "Step 1: Input Analysis ---> Step 2: Policy & Architecture Gate ---> Step 3: Verified Execution",
+                      reflectionQuestion:
+                        l.reflectionQuestion ||
+                        `In your own words, what is the most critical operational takeaway from ${l.title}?`,
                       hasQuiz: true,
                     })),
                   }))
@@ -115,18 +137,15 @@ export default function CoursePlayerPage({
                       lessons: [
                         {
                           id: "l_def_1",
-                          title: "Introduction & Strategy Overview",
-                          type: "video",
-                          duration: "15m",
-                          videoUrl: "https://www.youtube.com/embed/j0ieRrwae5w",
-                        },
-                        {
-                          id: "l_def_2",
-                          title: "Key Framework Guidelines",
+                          title: "Foundational Concepts & Principles",
                           type: "article",
                           duration: "10m",
                           articleContent:
-                            "Organizational compliance requires continuous learning, regular self-assessments, and cross-team communication.",
+                            "Comprehensive training on core fundamentals. Understanding foundational architecture and practical operational workflows is essential for high-velocity teams.",
+                          diagram:
+                            "Step 1: Ingestion & Auth ---> Step 2: Validation Engine ---> Step 3: Execution Output",
+                          reflectionQuestion:
+                            "In your own words, how would you explain the primary purpose of this topic to a junior team member?",
                           hasQuiz: true,
                         },
                       ],
@@ -134,34 +153,24 @@ export default function CoursePlayerPage({
                   ],
             quiz: {
               title: `${c.title} Assessment`,
-              questions: [
-                {
-                  id: "q_cust_1",
-                  text: `What is the primary compliance principle taught in ${c.title}?`,
-                  options: [
-                    "Continuous learning, verification, and proactive security hygiene",
-                    "Ignoring security policies unless an audit is announced",
-                    "Sharing administrative credentials across departments",
-                    "Disabling multifactor authentication for faster login",
-                  ],
-                  correctIndex: 0,
-                  explanation:
-                    "Proactive compliance and continuous verification form the core foundation of organizational capability.",
-                },
-                {
-                  id: "q_cust_2",
-                  text: "Why is browser extension permission scoping critical for organizational defense?",
-                  options: [
-                    "Extensions with broad permissions can read and exfiltrate sensitive session tokens and credentials",
-                    "Extensions use too much disk space on local SSDs",
-                    "Extensions change the browser theme colors unexpectedly",
-                    "Extensions disable monitor brightness settings",
-                  ],
-                  correctIndex: 0,
-                  explanation:
-                    "Malicious or over-privileged browser extensions can capture keystrokes and session cookies, bypassing standard per-request firewall inspection.",
-                },
-              ],
+              questions:
+                c.metadata?.quizzes && c.metadata.quizzes.length > 0
+                  ? c.metadata.quizzes
+                  : [
+                      {
+                        id: "q_cust_1",
+                        text: `What is the foundational principle taught in ${c.title}?`,
+                        options: [
+                          "Continuous validation, clear structure, and proactive hygiene",
+                          "Disabling compliance checks to save time",
+                          "Sharing administrative credentials across unverified tools",
+                          "Ignoring system logs during incident response",
+                        ],
+                        correctIndex: 0,
+                        explanation:
+                          "Continuous verification and structured operational hygiene form the core foundation.",
+                      },
+                    ],
             },
           };
           setCourse(customDetail);
@@ -172,23 +181,20 @@ export default function CoursePlayerPage({
   }, [courseId]);
 
   const flatLessons = course.modules.flatMap((m) => m.lessons);
+  const currentLesson: any = flatLessons[currentLessonIndex] || flatLessons[0];
 
-  const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
-  const [completedLessons, setCompletedLessons] = useState<Set<string>>(
-    new Set([flatLessons[0]?.id || "l1"])
-  );
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Reset reflection input when switching lessons
+  useEffect(() => {
+    setReflectionInput("");
+    setReflectionResult(null);
+  }, [currentLessonIndex]);
 
-  // Quiz Modal State
-  const [quizOpen, setQuizOpen] = useState(false);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
-  const [quizSubmitted, setQuizSubmitted] = useState(false);
-  const [quizScore, setQuizScore] = useState(0);
+  // Accurate progress calculation (0% if none completed)
+  const progressPercent =
+    flatLessons.length > 0
+      ? Math.round((completedLessons.size / flatLessons.length) * 100)
+      : 0;
 
-  const currentLesson = flatLessons[currentLessonIndex] || flatLessons[0];
-  const progressPercent = Math.round(
-    (completedLessons.size / Math.max(1, flatLessons.length)) * 100
-  );
   const isCompleted = completedLessons.has(currentLesson?.id);
 
   const handleNext = () => {
@@ -209,10 +215,10 @@ export default function CoursePlayerPage({
     setCompletedLessons(nextSet);
 
     const isAllComplete = nextSet.size === flatLessons.length;
-    toast.success(`Lesson marked as completed! (+${Math.round(100 / flatLessons.length)}%)`);
+    toast.success(`Lesson marked complete! Progress: ${Math.round((nextSet.size / flatLessons.length) * 100)}%`);
 
     if (isAllComplete) {
-      toast.success("🎉 Congratulations! You have completed all lessons in this course!");
+      toast.success("🎉 Congratulations! You completed all lessons in this course!");
       if (user?.id) {
         await createNotification({
           userId: user.id,
@@ -238,6 +244,33 @@ export default function CoursePlayerPage({
     }
 
     handleNext();
+  };
+
+  const handleEvaluateReflection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reflectionInput.trim() || isEvaluatingReflection) return;
+
+    setIsEvaluatingReflection(true);
+    toast.info("Evaluating your reflection with Groq AI...");
+
+    try {
+      const res = await evaluateReflectionAnswer({
+        lessonTitle: currentLesson?.title || "Lesson",
+        reflectionQuestion:
+          currentLesson?.reflectionQuestion ||
+          "What is the most critical operational takeaway from this lesson?",
+        userAnswer: reflectionInput.trim(),
+      });
+
+      if (res.success && res.data) {
+        setReflectionResult(res.data);
+        toast.success(`Relevance Evaluated: ${res.data.relevanceScore}%! ✨`);
+      }
+    } catch (err: any) {
+      toast.error("Evaluation error: " + err.message);
+    } finally {
+      setIsEvaluatingReflection(false);
+    }
   };
 
   const handleQuizAnswer = (qId: string, optIdx: number) => {
@@ -284,6 +317,24 @@ export default function CoursePlayerPage({
     setQuizScore(0);
   };
 
+  const flashcards = [
+    {
+      id: "fc1",
+      front: `Core Principle of ${course.title}`,
+      back: "Establishing consistent, verified, and proactive operational standards.",
+    },
+    {
+      id: "fc2",
+      front: "Why are mid-lesson reflection checkpoints important?",
+      back: "They reinforce active recall and validate conceptual synthesis rather than passive reading.",
+    },
+    {
+      id: "fc3",
+      front: "What constitutes passing competency?",
+      back: "Achieving >=70% score on the comprehensive AI assessment quiz.",
+    },
+  ];
+
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-background">
       {/* Main Content Area */}
@@ -296,7 +347,7 @@ export default function CoursePlayerPage({
               className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="h-4 w-4 mr-1" />
-              Back to Course
+              Course Syllabus
             </Link>
             <Separator orientation="vertical" className="h-4" />
             <h2 className="text-xs sm:text-sm font-semibold text-foreground truncate max-w-md">
@@ -305,6 +356,19 @@ export default function CoursePlayerPage({
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setFlashcardIndex(0);
+                setIsCardFlipped(false);
+                setFlashcardsOpen(true);
+              }}
+              className="text-xs h-8 gap-1.5 font-medium"
+            >
+              <Layers className="h-3.5 w-3.5 text-primary" /> Study Flashcards
+            </Button>
+
             <Button
               variant="outline"
               size="sm"
@@ -317,81 +381,131 @@ export default function CoursePlayerPage({
         </div>
 
         {/* Lesson Viewer Content */}
-        <div className="p-6 md:p-8 max-w-4xl mx-auto w-full space-y-6 flex-1">
-          {/* VIDEO LESSON */}
-          {currentLesson?.type === "video" && (
-            <div className="space-y-4">
-              <div className="relative aspect-video rounded-2xl overflow-hidden bg-black shadow-lg border border-border">
-                <iframe
-                  src={currentLesson.videoUrl || "https://www.youtube.com/embed/j0ieRrwae5w"}
-                  title={currentLesson.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="w-full h-full border-0"
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <div>
-                  <h1 className="text-xl font-bold text-foreground">{currentLesson.title}</h1>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Module Duration: {currentLesson.duration} • Interactive Video Lecture
-                  </p>
-                </div>
-              </div>
+        <div className="p-6 md:p-8 max-w-4xl mx-auto w-full space-y-8 flex-1">
+          {/* Header Badge & Title */}
+          <div className="border-b border-border pb-5 space-y-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs bg-primary/10 text-primary font-semibold">
+                Lesson {currentLessonIndex + 1} of {flatLessons.length}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                Est. Reading Time: {currentLesson?.duration || "10m"}
+              </span>
             </div>
-          )}
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              {currentLesson?.title}
+            </h1>
+          </div>
 
-          {/* ARTICLE LESSON */}
-          {currentLesson?.type === "article" && (
-            <div className="space-y-6">
-              <div className="border-b border-border pb-4">
-                <Badge variant="secondary" className="text-xs mb-2">
-                  Compliance Reading
-                </Badge>
-                <h1 className="text-2xl font-bold text-foreground">{currentLesson.title}</h1>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Estimated reading time: {currentLesson.duration}
-                </p>
-              </div>
+          {/* VISUAL PROCESS FLOW / ARCHITECTURE DIAGRAM */}
+          <div className="p-5 bg-gradient-to-r from-primary/5 via-muted/40 to-primary/5 rounded-2xl border border-border space-y-2.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-primary">
+              <Compass className="w-4 h-4" />
+              <span>Operational Flow & Architecture Schematic</span>
+            </div>
+            <div className="p-3.5 bg-background rounded-xl border border-border/80 font-mono text-xs text-foreground tracking-wide flex items-center justify-center text-center shadow-xs">
+              {currentLesson?.diagram ||
+                "Input Context ---> Policy Verification Engine ---> Scalable Enforcement Output"}
+            </div>
+          </div>
 
-              <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground leading-relaxed space-y-4">
-                <div className="p-4 bg-muted/40 rounded-xl border border-border/70 text-foreground font-medium text-xs leading-relaxed">
-                  {currentLesson.articleContent ||
-                    "Organizational compliance requires continuous learning, regular self-assessments, and cross-team communication."}
-                </div>
+          {/* MAIN EDUCATIONAL SUMMARY & READING CONTENT */}
+          <div className="space-y-4 text-xs sm:text-sm text-foreground/90 leading-relaxed">
+            <div className="p-5 bg-card rounded-2xl border border-border space-y-3">
+              <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-primary" /> Key Principles & Conceptual Synthesis
+              </h3>
+              <p className="text-muted-foreground leading-relaxed text-xs sm:text-sm">
+                {currentLesson?.articleContent ||
+                  "Comprehensive structured training on core fundamentals. Understanding foundational architecture and practical operational workflows is essential for high-velocity teams."}
+              </p>
 
-                <h3 className="text-base font-semibold text-foreground pt-2">
-                  Key Operational Guidelines
-                </h3>
-                <ul className="list-disc pl-5 space-y-2 text-xs">
-                  <li>Always verify permissions requested by third-party tooling and browser add-ons.</li>
-                  <li>Ensure multi-factor authentication (MFA) is actively enforced across all team logins.</li>
-                  <li>Report any suspicious access or token anomalies to the enterprise security team.</li>
+              <div className="pt-3 border-t border-border/70 space-y-2">
+                <h4 className="font-semibold text-xs text-foreground uppercase tracking-wider">
+                  Operational Guidelines & Best Practices:
+                </h4>
+                <ul className="list-disc pl-5 space-y-1.5 text-xs text-muted-foreground">
+                  <li>Ensure all access scopes and operational policies are continuously verified.</li>
+                  <li>Implement proactive monitoring and automated sanity checks at every transition gate.</li>
+                  <li>Regularly evaluate team comprehension through open-ended reflection scenarios.</li>
                 </ul>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* PDF LESSON */}
-          {currentLesson?.type === "pdf" && (
-            <div className="space-y-4">
-              <div className="p-8 border-2 border-dashed border-border rounded-2xl bg-muted/20 text-center space-y-4">
-                <FileText className="h-12 w-12 text-primary mx-auto" />
-                <div>
-                  <h3 className="font-semibold text-base text-foreground">
-                    {currentLesson.title}
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Official Documentation & Governance Framework
-                  </p>
+          {/* MID-LESSON OPEN-ENDED REFLECTION & RELEVANCE EVALUATOR */}
+          <div className="p-6 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-primary/10 rounded-lg text-primary">
+                  <Lightbulb className="w-4 h-4" />
                 </div>
-                <Button variant="outline" size="sm" className="gap-2 text-xs">
-                  <ExternalLink className="h-3.5 w-3.5" /> Download / Open Document
+                <h3 className="font-bold text-sm text-foreground">
+                  Knowledge Reflection & AI Coaching Checkpoint
+                </h3>
+              </div>
+              <Badge variant="outline" className="text-[10px]">
+                Relevance Graded
+              </Badge>
+            </div>
+
+            <p className="text-xs font-semibold text-foreground">
+              {currentLesson?.reflectionQuestion ||
+                "In your own words, what is the most critical operational takeaway from this lesson?"}
+            </p>
+
+            <form onSubmit={handleEvaluateReflection} className="space-y-3">
+              <Textarea
+                placeholder="Type your reflection or practical solution here (e.g. How you would apply this in a production workflow)..."
+                value={reflectionInput}
+                onChange={(e) => setReflectionInput(e.target.value)}
+                className="text-xs min-h-[90px] bg-background"
+              />
+
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] text-muted-foreground">
+                  AI will evaluate relevance and provide coaching notes without failing you.
+                </span>
+
+                <Button
+                  type="submit"
+                  disabled={isEvaluatingReflection || !reflectionInput.trim()}
+                  size="sm"
+                  className="text-xs h-8 gap-1.5 font-semibold"
+                >
+                  {isEvaluatingReflection ? (
+                    <>
+                      <RefreshCw className="w-3 h-3 animate-spin" /> Evaluating...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3 h-3" /> Evaluate My Reflection
+                    </>
+                  )}
                 </Button>
               </div>
-            </div>
-          )}
+            </form>
+
+            {/* AI Coaching Feedback Card */}
+            {reflectionResult && (
+              <div className="p-4 bg-background rounded-xl border border-border space-y-2 mt-3 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <Badge
+                    variant="secondary"
+                    className="text-xs bg-success/15 text-success border-success/30 font-bold"
+                  >
+                    Relevance Score: {reflectionResult.relevanceScore}% ✨
+                  </Badge>
+                  <span className="text-[11px] text-muted-foreground">
+                    Strengths: <strong className="text-foreground">{reflectionResult.keyStrength}</strong>
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed pt-1">
+                  💡 <strong className="text-foreground">AI Feedback:</strong> {reflectionResult.feedback}
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Lesson Action Footer */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t border-border mt-8">
@@ -403,7 +517,7 @@ export default function CoursePlayerPage({
                 disabled={currentLessonIndex === 0}
                 className="gap-1.5 text-xs h-9"
               >
-                <ChevronLeft className="h-4 w-4" /> Previous
+                <ChevronLeft className="h-4 w-4" /> Previous Lesson
               </Button>
               <Button
                 variant="outline"
@@ -412,24 +526,22 @@ export default function CoursePlayerPage({
                 disabled={currentLessonIndex === flatLessons.length - 1}
                 className="gap-1.5 text-xs h-9"
               >
-                Next <ChevronRight className="h-4 w-4" />
+                Next Lesson <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
 
             <div className="flex items-center gap-3">
-              {currentLesson?.hasQuiz && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    handleQuizReset();
-                    setQuizOpen(true);
-                  }}
-                  className="gap-2 text-xs h-9 font-semibold bg-primary/10 text-primary hover:bg-primary/20"
-                >
-                  <Sparkles className="h-4 w-4 text-primary" /> Take AI Assessment
-                </Button>
-              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  handleQuizReset();
+                  setQuizOpen(true);
+                }}
+                className="gap-2 text-xs h-9 font-semibold bg-primary/10 text-primary hover:bg-primary/20"
+              >
+                <Sparkles className="h-4 w-4 text-primary" /> Take AI Assessment
+              </Button>
 
               <Button
                 size="sm"
@@ -440,7 +552,7 @@ export default function CoursePlayerPage({
                 )}
               >
                 <Check className="h-4 w-4" />
-                {isCompleted ? "Completed" : "Mark as Complete"}
+                {isCompleted ? "Completed ✓" : "Mark as Complete"}
               </Button>
             </div>
           </div>
@@ -474,7 +586,7 @@ export default function CoursePlayerPage({
 
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Overall Progress</span>
+              <span>Course Progress</span>
               <span className="font-semibold text-foreground">{progressPercent}%</span>
             </div>
             <Progress value={progressPercent} className="h-1.5" />
@@ -519,13 +631,12 @@ export default function CoursePlayerPage({
                               )}
                             />
                           ) : (
-                            getLessonIcon(
-                              lesson.type,
-                              cn(
+                            <BookOpen
+                              className={cn(
                                 "h-4 w-4 shrink-0",
                                 isCurrent ? "text-primary-foreground" : "text-muted-foreground"
-                              )
-                            )
+                              )}
+                            />
                           )}
                           <span className="truncate">{lesson.title}</span>
                         </div>
@@ -548,7 +659,74 @@ export default function CoursePlayerPage({
         </ScrollArea>
       </div>
 
-      {/* AI Assessment Quiz Modal */}
+      {/* FLASHCARDS STUDY MODAL */}
+      <Dialog open={flashcardsOpen} onOpenChange={setFlashcardsOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-primary" />
+                <DialogTitle className="text-base font-bold">Revision Flashcards</DialogTitle>
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                Card {flashcardIndex + 1} of {flashcards.length}
+              </Badge>
+            </div>
+            <DialogDescription className="text-xs">
+              Click the card to flip between Question and Conceptual Insight.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 pt-2 flex flex-col items-center">
+            <div
+              onClick={() => setIsCardFlipped(!isCardFlipped)}
+              className="w-full min-h-[200px] p-8 rounded-2xl border-2 border-border/80 bg-gradient-to-br from-card to-muted/40 shadow-xs cursor-pointer flex flex-col items-center justify-center text-center hover:border-primary/50 transition-all select-none relative group"
+            >
+              <Badge variant="outline" className="absolute top-4 left-4 text-[10px]">
+                {isCardFlipped ? "Answer / Definition" : "Prompt / Concept"}
+              </Badge>
+
+              <p className="text-sm font-semibold text-foreground leading-relaxed max-w-md">
+                {isCardFlipped ? flashcards[flashcardIndex]?.back : flashcards[flashcardIndex]?.front}
+              </p>
+
+              <span className="text-[10px] text-muted-foreground absolute bottom-4 group-hover:text-primary transition-colors">
+                Click card to flip ↻
+              </span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsCardFlipped(false);
+                  setFlashcardIndex((prev) => Math.max(0, prev - 1));
+                }}
+                disabled={flashcardIndex === 0}
+                className="text-xs h-8 gap-1"
+              >
+                <ChevronLeft className="w-4 h-4" /> Previous
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsCardFlipped(false);
+                  setFlashcardIndex((prev) => Math.min(flashcards.length - 1, prev + 1));
+                }}
+                disabled={flashcardIndex === flashcards.length - 1}
+                className="text-xs h-8 gap-1"
+              >
+                Next <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI ASSESSMENT QUIZ MODAL */}
       <Dialog open={quizOpen} onOpenChange={setQuizOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -565,7 +743,7 @@ export default function CoursePlayerPage({
 
           <div className="space-y-6 pt-3">
             {course.quiz?.questions?.map((q, qIdx) => (
-              <div key={q.id} className="p-4 rounded-xl border border-border/80 bg-muted/20 space-y-3">
+              <div key={q.id || qIdx} className="p-4 rounded-xl border border-border/80 bg-muted/20 space-y-3">
                 <p className="text-xs font-semibold text-foreground">
                   {qIdx + 1}. {q.text}
                 </p>

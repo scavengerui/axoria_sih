@@ -220,69 +220,97 @@ export async function generatePersonalAICourse(params: {
   userId: string;
   orgId?: string;
   preferences?: {
-    includeQuiz?: boolean;
-    includeFlashcards?: boolean;
-    includeReadings?: boolean;
+    quizCount?: number;
+    flashcardCount?: number;
     difficulty?: "Beginner" | "Intermediate" | "Advanced";
   };
 }) {
   try {
     const groq = getGroqClient();
     const topic = params.topic.trim();
+    const numQuizzes = params.preferences?.quizCount || 3;
+    const numFlashcards = params.preferences?.flashcardCount || 4;
+    const difficulty = params.preferences?.difficulty || "Intermediate";
 
-    const prompt = `You are the master curriculum architect for the Axoria enterprise learning engine.
-Create a rich, structured, comprehensive educational course on the topic: "${topic}".
-Difficulty level: ${params.preferences?.difficulty || "Comprehensive"}.
+    const prompt = `You are the master pedagogical architect for Axoria learning engine.
+Create a structured, in-depth, reading-focused educational course on: "${topic}".
+Difficulty: ${difficulty}.
+All lessons must be clear, structured text summaries with conceptual breakdowns and visual process diagrams (NO video requirements).
 
-Return ONLY a valid JSON object matching this EXACT schema (No extra commentary, no backticks):
+Return ONLY a valid JSON object matching this EXACT structure (no extra text):
 {
-  "title": "Comprehensive title for the topic",
-  "description": "2-3 sentences explaining what skills the learner will acquire and why it matters.",
-  "competencyTags": ["Tag1", "Tag2", "Tag3"],
-  "estimatedDuration": 45,
+  "title": "${topic} Mastery & Operational Architecture",
+  "description": "Comprehensive practical curriculum covering fundamentals, architecture, and real-world workflows for ${topic}.",
+  "competencyTags": ["${topic.split(" ")[0] || "Specialized"}", "Architecture", "Mastery"],
+  "estimatedDuration": 35,
   "modules": [
     {
-      "title": "Module 1: Foundations & Core Concepts",
+      "title": "Module 1: Core Fundamentals & Principles",
       "order": 1,
       "lessons": [
         {
-          "title": "Lesson 1: Introduction and Architecture",
-          "type": "video",
-          "duration": 15,
-          "order": 1,
-          "contentUrl": "https://www.youtube.com/embed/j0ieRrwae5w"
-        },
-        {
-          "title": "Lesson 2: Core Principles & Operational Guidelines",
+          "title": "Foundational Concepts & Principles",
           "type": "article",
           "duration": 10,
+          "order": 1,
+          "content": "In-depth summary explaining the fundamental concepts, core mechanics, and why this topic is essential in modern software and enterprise engineering.",
+          "diagram": "STEP 1: Ingestion / Auth ---> STEP 2: Validation Engine ---> STEP 3: Execution / Enforcement",
+          "reflectionQuestion": "In your own words, how would you explain the primary purpose of ${topic} to a junior team member?"
+        },
+        {
+          "title": "Operational Guidelines & Workflow Breakdown",
+          "type": "article",
+          "duration": 12,
           "order": 2,
-          "content": "Detailed educational paragraph with operational steps, best practices, and conceptual breakdown."
+          "content": "Detailed step-by-step best practices, operational checklists, and failure modes to avoid when implementing ${topic}.",
+          "diagram": "Request Context ---> Policy Evaluation Gate ---> Secure State Transition",
+          "reflectionQuestion": "What is one critical pitfall to avoid during practical implementation, and how would you mitigate it?"
         }
       ]
     },
     {
-      "title": "Module 2: Practical Implementation & Strategy",
+      "title": "Module 2: Practical Implementation & Synthesis",
       "order": 2,
       "lessons": [
         {
-          "title": "Lesson 3: Advanced Techniques & Real-world Scenarios",
+          "title": "Real-World Architecture & Case Studies",
           "type": "article",
-          "duration": 10,
+          "duration": 13,
           "order": 1,
-          "content": "In-depth insights, real-world failure modes to avoid, and industry standard procedures."
-        },
-        {
-          "title": "Lesson 4: Capstone Evaluation & Assessment",
-          "type": "article",
-          "duration": 10,
-          "order": 2,
-          "content": "Final review of key takeaways and summary checklist before certification."
+          "content": "Analysis of enterprise design patterns, real-world case studies, and performance optimization strategies.",
+          "diagram": "Client / Agent ---> Load Balancer ---> Isolated Execution Core ---> Audit Log",
+          "reflectionQuestion": "How does adopting this architecture enhance overall reliability and system compliance?"
         }
       ]
     }
+  ],
+  "quizzes": [
+    {
+      "id": "q1",
+      "text": "What is a primary principle of ${topic}?",
+      "options": [
+        "Continuous validation and structured operational hygiene",
+        "Ignoring errors during production rollout",
+        "Disabling security controls for convenience",
+        "Hardcoding static secrets in source code"
+      ],
+      "correctIndex": 0,
+      "explanation": "Continuous validation and structured operational hygiene form the core of reliable execution."
+    }
+  ],
+  "flashcards": [
+    {
+      "id": "fc1",
+      "front": "What is the core objective of ${topic}?",
+      "back": "To establish consistent, scalable, and verifiable operational competencies."
+    }
   ]
-}`;
+}
+
+Rules:
+- Generate exactly ${numQuizzes} multiple choice questions.
+- Generate exactly ${numFlashcards} flashcards with front and back.
+- Ensure every lesson includes a reflectionQuestion and diagram flow.`;
 
     let generatedData: any = null;
 
@@ -292,7 +320,7 @@ Return ONLY a valid JSON object matching this EXACT schema (No extra commentary,
           model,
           messages: [{ role: "user", content: prompt }],
           temperature: 0.3,
-          max_tokens: 3000,
+          max_tokens: 3500,
         });
 
         const raw = completion.choices[0]?.message?.content || "";
@@ -309,45 +337,72 @@ Return ONLY a valid JSON object matching this EXACT schema (No extra commentary,
     }
 
     if (!generatedData) {
-      // Fallback structured course in case of network issue
+      // Fallback clean structured course
       generatedData = {
-        title: `${topic.charAt(0).toUpperCase() + topic.slice(1)} Mastery & Practical Application`,
-        description: `Master fundamental concepts, industry guidelines, and practical workflows for ${topic}.`,
+        title: `${topic.charAt(0).toUpperCase() + topic.slice(1)} Mastery & Practical Architecture`,
+        description: `Comprehensive practical curriculum covering fundamentals, architecture, and real-world workflows for ${topic}.`,
         competencyTags: [topic.split(" ")[0] || "Specialized", "Enterprise", "Competency"],
-        estimatedDuration: 40,
+        estimatedDuration: 35,
         modules: [
           {
             title: "Module 1: Core Fundamentals & Principles",
             order: 1,
             lessons: [
               {
-                title: `${topic} Foundations & Strategy`,
-                type: "video",
-                duration: 15,
-                order: 1,
-                contentUrl: "https://www.youtube.com/embed/j0ieRrwae5w",
-              },
-              {
-                title: "Key Framework Guidelines & Best Practices",
+                title: "Foundational Concepts & Principles",
                 type: "article",
                 duration: 10,
+                order: 1,
+                content: `Comprehensive training on ${topic}. Understanding core principles, foundational architecture, and practical operational workflows is essential for high-velocity teams.`,
+                diagram: "STEP 1: Input / Request ---> STEP 2: Policy & Logic Gate ---> STEP 3: Execution Output",
+                reflectionQuestion: `In your own words, what is the core benefit of mastering ${topic}?`,
+              },
+              {
+                title: "Operational Guidelines & Workflow Breakdown",
+                type: "article",
+                duration: 12,
                 order: 2,
-                content: `Comprehensive training on ${topic}. Continuous learning, regular verification, and adherence to operational standards ensures team success.`,
+                content: `Step-by-step methodologies and best practices for ${topic}. Regular self-assessments and cross-team communication mitigate failure risks.`,
+                diagram: "Client State ---> Verification Check ---> Audit Log Verification",
+                reflectionQuestion: "What is one key operational safeguard you would implement first?",
               },
             ],
           },
           {
-            title: "Module 2: Advanced Scenario & Synthesis",
+            title: "Module 2: Practical Implementation & Synthesis",
             order: 2,
             lessons: [
               {
-                title: "Real-world Applications & Case Studies",
+                title: "Real-World Architecture & Case Studies",
                 type: "article",
-                duration: 15,
+                duration: 13,
                 order: 1,
-                content: `Analyzing operational patterns in ${topic} to maximize productivity and mitigate organizational risks.`,
+                content: `Analyzing enterprise adoption patterns and optimization techniques for ${topic}.`,
+                diagram: "User Context ---> Scalable Service Core ---> Monitored Telemetry",
+                reflectionQuestion: "How would you measure the success of this workflow in a production environment?",
               },
             ],
+          },
+        ],
+        quizzes: [
+          {
+            id: "q1",
+            text: `What is the foundational principle of ${topic}?`,
+            options: [
+              "Continuous validation, clear structure, and proactive hygiene",
+              "Disabling compliance checks to save time",
+              "Sharing administrative credentials across unverified tools",
+              "Ignoring system logs during incident response",
+            ],
+            correctIndex: 0,
+            explanation: "Continuous verification and structured operational hygiene form the core foundation.",
+          },
+        ],
+        flashcards: [
+          {
+            id: "fc1",
+            front: `What is the primary purpose of ${topic}?`,
+            back: "To build reliable, scalable, and verifiable competencies across the organization.",
           },
         ],
       };
@@ -356,20 +411,24 @@ Return ONLY a valid JSON object matching this EXACT schema (No extra commentary,
     await connectToDatabase();
 
     // 1. Save Course to MongoDB
-    const newCourse = await Course.create({
+    const newCourse: any = await Course.create({
       title: generatedData.title,
       description: generatedData.description,
       thumbnail: "",
-      competencyTags: generatedData.competencyTags || [topic, "Self-Directed"],
+      competencyTags: generatedData.competencyTags || [topic, "Personalized"],
       mandatory: false,
-      estimatedDuration: generatedData.estimatedDuration || 40,
+      estimatedDuration: generatedData.estimatedDuration || 35,
       createdBy: params.userId,
       orgId: params.orgId || "axoria_enterprise",
       status: "published",
       modules: generatedData.modules,
+      metadata: {
+        quizzes: generatedData.quizzes,
+        flashcards: generatedData.flashcards,
+      },
     });
 
-    // 2. Automatically Enroll the User into their newly generated course
+    // 2. Automatically Enroll the User into their newly generated course (starts at 0% progress!)
     await Enrollment.findOneAndUpdate(
       { userId: params.userId, courseId: newCourse._id },
       {
@@ -390,7 +449,7 @@ Return ONLY a valid JSON object matching this EXACT schema (No extra commentary,
       orgId: params.orgId || "axoria_enterprise",
       type: "course_update",
       title: `✨ Personal Course Generated: ${newCourse.title}`,
-      message: `Your custom AI-generated course on "${topic}" has been added to My Learning.`,
+      message: `Your custom curriculum on "${topic}" has been added to My Learning with interactive reflection checkpoints.`,
       link: `/learn/${newCourse._id}`,
       read: false,
     });

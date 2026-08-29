@@ -9,6 +9,8 @@ export interface ILesson {
   type: LessonType;
   contentUrl?: string;
   content?: string;
+  diagram?: string;
+  reflectionQuestion?: string;
   duration?: number; // in minutes
   order: number;
   quizId?: Types.ObjectId;
@@ -32,6 +34,7 @@ export interface ICourse extends Document {
   status: CourseStatus;
   mandatory: boolean;
   estimatedDuration?: number; // total minutes
+  metadata?: any;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +49,8 @@ const LessonSchema = new Schema<ILesson>(
     },
     contentUrl: { type: String, trim: true },
     content: { type: String },
+    diagram: { type: String },
+    reflectionQuestion: { type: String },
     duration: { type: Number, min: 0 },
     order: { type: Number, required: true, min: 0 },
     quizId: { type: Schema.Types.ObjectId, ref: 'Quiz' },
@@ -79,6 +84,7 @@ const CourseSchema = new Schema<ICourse>(
     },
     mandatory: { type: Boolean, default: false },
     estimatedDuration: { type: Number, min: 0 },
+    metadata: { type: Schema.Types.Mixed },
   },
   { timestamps: true }
 );
