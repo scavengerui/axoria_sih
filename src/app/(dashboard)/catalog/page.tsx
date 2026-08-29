@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useUser, useOrganization } from "@clerk/nextjs";
 import {
   Search,
   Clock,
@@ -9,11 +11,27 @@ import {
   Star,
   BookOpen,
   Sparkles,
+  Plus,
+  Compass,
+  ArrowRight,
+  Layers,
+  HelpCircle,
+  FileText,
+  RefreshCw,
+  Check,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -22,7 +40,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatDuration } from "@/lib/utils";
-import { getCourses } from "@/lib/actions/course";
+import { getCourses, generatePersonalAICourse } from "@/lib/actions/course";
+import { toast } from "sonner";
+
+const QUICK_TOPICS = [
+  "Docker Container Security & Zero-Trust",
+  "React Server Components & Next.js Architecture",
+  "Cloud Native Microservices with Kubernetes",
+  "Executive Cross-Functional Leadership",
+  "AI Prompt Engineering & LLM Guardrails",
+];
 
 function CourseCard({ course }: { course: any }) {
   const targetId = course._id;
@@ -88,12 +115,24 @@ function CourseCard({ course }: { course: any }) {
 }
 
 export default function CatalogPage() {
+  const router = useRouter();
+  const { user } = useUser();
+  const { organization } = useOrganization();
+
   const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTag, setFilterTag] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [isDbLoaded, setIsDbLoaded] = useState(false);
+
+  // Personal AI Course Creator State
+  const [isCreatorOpen, setIsCreatorOpen] = useState(false);
+  const [customTopic, setCustomTopic] = useState("");
+  const [difficulty, setDifficulty] = useState<"Beginner" | "Intermediate" | "Advanced">("Intermediate");
+  const [includeQuiz, setIncludeQuiz] = useState(true);
+  const [includeFlashcards, setIncludeFlashcards] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     async function loadCourses() {
@@ -130,6 +169,44 @@ export default function CatalogPage() {
     loadCourses();
   }, []);
 
+  const handleGenerateCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customTopic.trim() || isGenerating) return;
+    if (!user?.id) {
+      toast.error("Please sign in to generate and save personal courses.");
+      return;
+    }
+
+    setIsGenerating(true);
+    toast.info(`Architecting custom curriculum for "${customTopic}" with Groq AI...`);
+
+    try {
+      const res = await generatePersonalAICourse({
+        topic: customTopic,
+        userId: user.id,
+        orgId: organization?.id || "axoria_enterprise",
+        preferences: {
+          includeQuiz,
+          includeFlashcards,
+          difficulty,
+        },
+      });
+
+      if (res.success && res.courseId) {
+        toast.success(`🎉 Course "${res.courseTitle}" created and added to My Learning!`);
+        setIsCreatorOpen(false);
+        setCustomTopic("");
+        router.push(`/learn/${res.courseId}`);
+      } else {
+        toast.error(res.error || "Failed to generate personal course.");
+      }
+    } catch (err: any) {
+      toast.error("Generation error: " + err.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // Filtered courses
   const filteredCourses = courses.filter((course) => {
     const matchesSearch =
@@ -153,19 +230,29 @@ export default function CatalogPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Course Catalog</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">Course Catalog</h1>
+            {isDbLoaded && (
+              <Badge variant="secondary" className="gap-1 text-xs bg-primary/10 text-primary">
+                <Sparkles className="h-3 w-3 text-primary" /> Live MongoDB
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Browse published courses and verify your organizational competencies.
+            Browse published courses or generate your own personalized AI learning track on any topic.
           </p>
         </div>
-        {isDbLoaded && (
-          <Badge variant="secondary" className="gap-1 text-xs bg-primary/10 text-primary">
-            <Sparkles className="h-3.5 w-3.5 text-primary" /> Live MongoDB Data
-          </Badge>
-        )}
+
+        {/* Action Button: AI Course Creator */}
+        <Button
+          onClick={() => setIsCreatorOpen(true)}
+          className="gap-2 text-xs h-9 font-semibold shadow-sm"
+        >
+          <Sparkles className="h-4 w-4" /> AI Course Generator (Any Topic)
+        </Button>
       </div>
 
       {/* Search & Filters */}
@@ -173,7 +260,7 @@ export default function CatalogPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search courses..."
+            placeholder="Search courses or keywords..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 text-xs h-9 bg-background"
@@ -234,9 +321,19 @@ export default function CatalogPage() {
         <div className="flex flex-col items-center justify-center py-16 text-center border rounded-xl border-dashed bg-muted/10">
           <BookOpen className="h-10 w-10 text-muted-foreground mb-3 opacity-50" />
           <h3 className="text-base font-semibold">No courses found</h3>
-          <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-            Try adjusting your search query or filter settings.
+          <p className="text-xs text-muted-foreground mt-1 max-w-sm mb-4">
+            Looking for something specific? Use our AI Course Creator to generate a personalized course on this topic!
           </p>
+          <Button
+            size="sm"
+            onClick={() => {
+              setCustomTopic(searchQuery);
+              setIsCreatorOpen(true);
+            }}
+            className="text-xs h-8 gap-1.5"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Generate Course on &ldquo;{searchQuery || "This Topic"}&rdquo;
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -245,6 +342,153 @@ export default function CatalogPage() {
           ))}
         </div>
       )}
+
+      {/* AI PERSONAL COURSE GENERATOR MODAL */}
+      <Dialog open={isCreatorOpen} onOpenChange={setIsCreatorOpen}>
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="p-1.5 bg-primary/10 rounded-lg text-primary">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary font-semibold">
+                Instant AI Curriculum Architect
+              </Badge>
+            </div>
+            <DialogTitle className="text-lg font-bold">Search & Generate Personal AI Course</DialogTitle>
+            <DialogDescription className="text-xs">
+              Type any topic or technology. Axoria AI will synthesize complete modules, video lectures, reading notes, and interactive quizzes synced directly to your MongoDB account.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleGenerateCourse} className="space-y-5 pt-2">
+            {/* Topic Input */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-foreground">
+                What topic do you want to learn?
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="e.g. Next.js 15 Server Actions, Quantum Computing, Docker Security..."
+                  value={customTopic}
+                  onChange={(e) => setCustomTopic(e.target.value)}
+                  className="pl-9 text-xs h-9"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Quick Suggestions */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] text-muted-foreground font-medium">
+                ⚡ Quick Inspiration Topics:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_TOPICS.map((topic) => (
+                  <button
+                    key={topic}
+                    type="button"
+                    onClick={() => setCustomTopic(topic)}
+                    className="text-[11px] px-2.5 py-1 rounded-lg border border-border bg-muted/30 hover:bg-primary/10 hover:text-primary hover:border-primary/40 transition-colors text-left"
+                  >
+                    {topic}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Artifact Selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-foreground">
+                Include in Your Course:
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIncludeQuiz(!includeQuiz)}
+                  className={`p-3 rounded-xl border text-xs flex items-center justify-between transition-all ${
+                    includeQuiz
+                      ? "border-primary bg-primary/10 text-primary font-semibold"
+                      : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4" /> AI Practice Quiz
+                  </span>
+                  {includeQuiz && <Check className="w-3.5 h-3.5" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIncludeFlashcards(!includeFlashcards)}
+                  className={`p-3 rounded-xl border text-xs flex items-center justify-between transition-all ${
+                    includeFlashcards
+                      ? "border-primary bg-primary/10 text-primary font-semibold"
+                      : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <Layers className="w-4 h-4" /> Flashcards & Notes
+                  </span>
+                  {includeFlashcards && <Check className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Difficulty Level */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-foreground">
+                Target Difficulty Level:
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["Beginner", "Intermediate", "Advanced"] as const).map((lvl) => (
+                  <button
+                    key={lvl}
+                    type="button"
+                    onClick={() => setDifficulty(lvl)}
+                    className={`py-2 rounded-lg border text-xs transition-all ${
+                      difficulty === lvl
+                        ? "border-primary bg-primary text-primary-foreground font-semibold"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {lvl}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Submit Actions */}
+            <div className="flex justify-end gap-2 pt-3 border-t border-border">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCreatorOpen(false)}
+                className="text-xs h-9"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isGenerating || !customTopic.trim()}
+                className="text-xs h-9 font-semibold gap-2"
+              >
+                {isGenerating ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Synthesizing with Groq LPU...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" /> Generate & Start Learning <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

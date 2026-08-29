@@ -95,11 +95,18 @@ export default function MyLearningPage() {
             Track your assigned compliance training, in-progress modules, and earned credentials.
           </p>
         </div>
-        {isDbLoaded && (
-          <Badge variant="secondary" className="gap-1 text-xs bg-primary/10 text-primary">
-            <Sparkles className="w-3.5 h-3.5 text-primary" /> Live MongoDB Data
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {isDbLoaded && (
+            <Badge variant="secondary" className="gap-1 text-xs bg-primary/10 text-primary">
+              <Sparkles className="w-3.5 h-3.5 text-primary" /> Live MongoDB Data
+            </Badge>
+          )}
+          <Link href="/catalog">
+            <Button size="sm" className="gap-1.5 text-xs h-9 font-semibold">
+              <Sparkles className="h-3.5 w-3.5" /> Generate AI Course
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {loading ? (
