@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useOrganization, UserButton, OrganizationSwitcher } from "@clerk/nextjs";
+import { useOrganization, UserButton, OrganizationSwitcher, useUser } from "@clerk/nextjs";
 import { AskAssistant } from "@/components/ai/AskAssistant";
 import { NotificationDropdown } from "@/components/layout/NotificationDropdown";
 import {
@@ -17,17 +17,15 @@ import {
   Settings,
   Menu,
   Search,
-  Bell,
-  Sparkles,
   ChevronLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn, resolveUserRole } from "@/lib/utils";
 import { useState } from "react";
 
 interface NavItem {
@@ -99,84 +97,103 @@ function NavSection({
   return (
     <div className="space-y-1">
       {!collapsed && (
-        <p className="px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground/60 mb-2">
+        <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           {title}
         </p>
       )}
-      {collapsed && <Separator className="my-2" />}
-      {items.map((item) => (
-        <NavLink key={item.href} item={item} collapsed={collapsed} />
-      ))}
+      <div className="space-y-0.5">
+        {items.map((item) => (
+          <NavLink key={item.href} item={item} collapsed={collapsed} />
+        ))}
+      </div>
     </div>
   );
 }
 
-function SidebarContent({ collapsed, userRole }: { collapsed: boolean; userRole: string }) {
-  const isAdmin = userRole === "org:admin";
-  const isManager = userRole === "org:manager";
-  const isTrainer = userRole === "org:trainer";
-  const isLearner = !isAdmin && !isManager && !isTrainer;
-
+function SidebarContent({
+  collapsed,
+  userRole,
+  isLoaded,
+}: {
+  collapsed: boolean;
+  userRole: string;
+  isLoaded: boolean;
+}) {
   return (
-    <div className="flex h-full flex-col">
-      {/* Logo mark */}
-      <div className={cn("flex items-center gap-3 px-4 py-5", collapsed && "justify-center px-2")}>
-        <img src="/axoria-logo.svg" alt="Axoria Logo" className="h-9 w-9 shrink-0 object-contain" />
-      </div>
-
-      <Separator />
-
-      {/* Navigation tailored strictly to the user's role */}
-      <ScrollArea className="flex-1 px-3 py-4">
-        <div className="space-y-6">
-          {/* Main shared navigation */}
-          <NavSection
-            title={isLearner ? "Learning Hub" : "Overview"}
-            items={commonNavItems}
-            collapsed={collapsed}
-          />
-
-          {/* Learner only */}
-          {isLearner && (
-            <NavSection
-              title="My Progress"
-              items={learnerNavItems}
-              collapsed={collapsed}
-            />
+    <div className="flex h-full flex-col justify-between">
+      {/* Brand */}
+      <div>
+        <div
+          className={cn(
+            "flex h-14 items-center border-b border-border px-4",
+            collapsed ? "justify-center" : "gap-3"
           )}
-
-          {/* Trainer only */}
-          {isTrainer && (
-            <NavSection
-              title="Trainer Studio"
-              items={trainerNavItems}
-              collapsed={collapsed}
-            />
-          )}
-
-          {/* Manager only */}
-          {isManager && (
-            <NavSection
-              title="Team Management"
-              items={managerNavItems}
-              collapsed={collapsed}
-            />
-          )}
-
-          {/* Admin only */}
-          {isAdmin && (
-            <NavSection
-              title="Administration"
-              items={adminNavItems}
-              collapsed={collapsed}
-            />
+        >
+          <img src="/axoria-logo.svg" alt="Axoria" className="h-7 w-7 shrink-0" />
+          {!collapsed && (
+            <span className="font-bold tracking-wider text-base">AXORIA</span>
           )}
         </div>
-      </ScrollArea>
 
-      <Separator />
+        {/* Navigation */}
+        <ScrollArea className="flex-1 px-3 py-4">
+          <div className="space-y-6">
+            <NavSection
+              title="Overview"
+              items={commonNavItems}
+              collapsed={collapsed}
+            />
 
-      {/* Settings */}
+            {!isLoaded ? (
+              <div className="space-y-2 px-3 pt-2">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-8 w-full rounded-lg" />
+                <Skeleton className="h-8 w-full rounded-lg" />
+              </div>
+            ) : (
+              <>
+                {/* Learner Nav */}
+                {userRole === "org:member" && (
+                  <NavSection
+                    title="My Progress"
+                    items={learnerNavItems}
+                    collapsed={collapsed}
+                  />
+                )}
+
+                {/* Trainer Nav */}
+                {(userRole === "org:trainer" || userRole === "org:admin") && (
+                  <NavSection
+                    title="Trainer Studio"
+                    items={trainerNavItems}
+                    collapsed={collapsed}
+                  />
+                )}
+
+                {/* Manager Nav */}
+                {(userRole === "org:manager" || userRole === "org:admin") && (
+                  <NavSection
+                    title="Management"
+                    items={managerNavItems}
+                    collapsed={collapsed}
+                  />
+                )}
+
+                {/* Admin Nav */}
+                {userRole === "org:admin" && (
+                  <NavSection
+                    title="Administration"
+                    items={adminNavItems}
+                    collapsed={collapsed}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Footer / Settings */}
       <div className="px-3 py-3">
         <NavLink
           item={{ title: "Settings", href: "/settings", icon: Settings }}
@@ -187,20 +204,18 @@ function SidebarContent({ collapsed, userRole }: { collapsed: boolean; userRole:
   );
 }
 
-import { resolveUserRole } from "@/lib/utils";
-import { useUser } from "@clerk/nextjs";
-
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user } = useUser();
-  const { membership } = useOrganization();
+  const { user, isLoaded: isUserLoaded } = useUser();
+  const { membership, isLoaded: isOrgLoaded } = useOrganization();
   const [collapsed, setCollapsed] = useState(false);
 
-  // Dynamic role resolution
-  const userRole = resolveUserRole(user?.primaryEmailAddress?.emailAddress, membership?.role);
+  const isLoaded = isUserLoaded && isOrgLoaded;
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
+  const userRole = resolveUserRole(userEmail, membership?.role);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -211,7 +226,7 @@ export default function DashboardLayout({
           collapsed ? "w-16" : "w-64"
         )}
       >
-        <SidebarContent collapsed={collapsed} userRole={userRole} />
+        <SidebarContent collapsed={collapsed} userRole={userRole} isLoaded={isLoaded} />
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="hidden md:flex items-center justify-center p-2 mb-2 mx-3 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
@@ -240,7 +255,7 @@ export default function DashboardLayout({
               }
             />
             <SheetContent side="left" className="w-64 p-0">
-              <SidebarContent collapsed={false} userRole={userRole} />
+              <SidebarContent collapsed={false} userRole={userRole} isLoaded={isLoaded} />
             </SheetContent>
           </Sheet>
 
@@ -251,7 +266,7 @@ export default function DashboardLayout({
               <Input
                 type="search"
                 placeholder="Search courses, lessons..."
-                className="pl-9 bg-muted/50 border-0 focus-visible:ring-1"
+                className="pl-9 bg-muted/50 border-0 focus-visible:ring-1 text-xs"
               />
             </div>
           </div>
