@@ -57,6 +57,7 @@ export default function SynapsePage() {
   const [docContent, setDocContent] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [isOcrDetected, setIsOcrDetected] = useState(false);
 
   // Active Tab in Analysis View
   const [activeTab, setActiveTab] = useState("summary");
@@ -75,14 +76,15 @@ export default function SynapsePage() {
   const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [isAnsweringDoubt, setIsAnsweringDoubt] = useState(false);
 
-  // Handle File Upload (txt, md, json, pdf, pptx, docx text reading via server parser)
+  // Handle File Upload (supports OCR on images, scanned PDFs, PPTX, DOCX, TXT)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const readableName = file.name.replace(/\.[^/.]+$/, "");
     setDocTitle(readableName);
-    toast.info(`Extracting clean text from "${file.name}"...`);
+    setIsOcrDetected(false);
+    toast.info(`Extracting & running OCR on "${file.name}"...`);
 
     try {
       if (
@@ -95,7 +97,7 @@ export default function SynapsePage() {
         setDocContent(text);
         toast.success(`Extracted ${text.length} characters from ${file.name}`);
       } else {
-        // Use server-side clean text extractor
+        // Use server-side clean text & OCR extractor
         const formData = new FormData();
         formData.append("file", file);
 
@@ -107,9 +109,14 @@ export default function SynapsePage() {
         const data = await res.json();
         if (data.success && data.text) {
           setDocContent(data.text);
-          toast.success(`Extracted ${data.textLength} characters from ${file.name}`);
+          if (data.isOcrUsed) {
+            setIsOcrDetected(true);
+            toast.success(`Optical Character Recognition (OCR) extracted ${data.textLength} chars! 👁️`);
+          } else {
+            toast.success(`Extracted ${data.textLength} characters from ${file.name}`);
+          }
         } else {
-          toast.error(data.error || "Could not read binary stream. Please paste text directly.");
+          toast.error(data.error || "Could not read file stream. Please paste text directly.");
         }
       }
     } catch (err: any) {
@@ -250,9 +257,16 @@ export default function SynapsePage() {
       {/* DOCUMENT INPUT / UPLOAD CARD */}
       <Card className="border border-border shadow-sm">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base font-semibold">Upload or Paste Knowledge Material</CardTitle>
+          <CardTitle className="text-base font-semibold flex items-center justify-between">
+            <span>Upload or Paste Knowledge Material</span>
+            {isOcrDetected && (
+              <Badge variant="secondary" className="bg-success/15 text-success border-success/30 text-[10px] gap-1">
+                <Sparkles className="w-3 h-3 text-success" /> OCR Visual Engine Active
+              </Badge>
+            )}
+          </CardTitle>
           <CardDescription className="text-xs">
-            Supports PDF, PPTX, DOCX, Markdown, Text, Code, or raw meeting notes.
+            Supports PDF, Scanned Documents & Screenshots (PNG, JPG, WEBP), PPTX, DOCX, Markdown, & Text.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -262,11 +276,11 @@ export default function SynapsePage() {
               <Upload className="w-8 h-8 text-primary" />
               <div>
                 <p className="text-xs font-semibold text-foreground">Drag & Drop or Click to Upload</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">.pdf, .pptx, .docx, .txt, .md</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">PDF, Scans, Images, PPTX, DOCX, TXT</p>
               </div>
               <input
                 type="file"
-                accept=".pdf,.pptx,.docx,.txt,.md,.json,.csv"
+                accept=".pdf,.png,.jpg,.jpeg,.webp,.pptx,.docx,.txt,.md,.json,.csv"
                 onChange={handleFileUpload}
                 className="absolute inset-0 opacity-0 cursor-pointer"
               />
@@ -291,7 +305,9 @@ export default function SynapsePage() {
 
           <div className="flex items-center justify-between pt-2 border-t border-border">
             <span className="text-[11px] text-muted-foreground font-mono">
-              {docContent.length > 0 ? `${docContent.length} characters ready for Groq LPU synthesis` : "Ready for input"}
+              {docContent.length > 0
+                ? `${docContent.length} characters ready for Groq LPU synthesis`
+                : "Ready for input"}
             </span>
 
             <Button
