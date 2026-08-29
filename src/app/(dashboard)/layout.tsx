@@ -187,16 +187,20 @@ function SidebarContent({ collapsed, userRole }: { collapsed: boolean; userRole:
   );
 }
 
+import { resolveUserRole } from "@/lib/utils";
+import { useUser } from "@clerk/nextjs";
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { user } = useUser();
   const { membership } = useOrganization();
   const [collapsed, setCollapsed] = useState(false);
 
-  // Real role from Clerk Organization membership
-  const userRole = membership?.role ?? "org:admin";
+  // Dynamic role resolution
+  const userRole = resolveUserRole(user?.primaryEmailAddress?.emailAddress, membership?.role);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">

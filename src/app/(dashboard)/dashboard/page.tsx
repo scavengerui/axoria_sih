@@ -223,11 +223,14 @@ function LearnerDashboard() {
   );
 }
 
+import { resolveUserRole } from "@/lib/utils";
+
 export default function DashboardPage() {
   const { user } = useUser();
   const { membership, organization } = useOrganization();
 
-  const userRole = membership?.role ?? "org:admin";
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
+  const userRole = resolveUserRole(userEmail, membership?.role);
   const userName = user?.firstName ?? "User";
 
   return (

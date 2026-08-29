@@ -169,10 +169,13 @@ function getNotificationIcon(type: string) {
   }
 }
 
+import { resolveUserRole } from "@/lib/utils";
+
 export function NotificationDropdown() {
   const { user } = useUser();
   const { membership } = useOrganization();
-  const userRole = membership?.role || "org:admin";
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
+  const userRole = resolveUserRole(userEmail, membership?.role);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>(() =>
     getRoleBasedDefaultNotifications(userRole)
@@ -182,7 +185,7 @@ export function NotificationDropdown() {
   const fetchNotifications = async () => {
     if (!user?.id) return;
     try {
-      const res = await getUserNotifications(user.id);
+      const res = await getUserNotifications(user.id, userEmail, userRole);
       if (res.success && res.notifications.length > 0) {
         setNotifications(res.notifications);
         setUnreadCount(res.unreadCount);

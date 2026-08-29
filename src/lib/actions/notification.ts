@@ -31,12 +31,15 @@ export async function createNotification(data: {
   }
 }
 
-export async function getUserNotifications(userId: string) {
+export async function getUserNotifications(userId: string, userEmail?: string, role?: string) {
   try {
     await connectToDatabase();
-    const notifications = await Notification.find({
-      $or: [{ userId }, { userId: "all_admins" }],
-    })
+    const isAdmin = userEmail === "sivadhanushkotturu@gmail.com" || role === "org:admin" || role === "admin";
+    const query = isAdmin
+      ? { $or: [{ userId }, { userId: "all_admins" }] }
+      : { userId };
+
+    const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
       .limit(20)
       .lean();

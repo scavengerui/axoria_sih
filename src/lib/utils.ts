@@ -40,3 +40,24 @@ export function generateCertificateId(): string {
   }
   return `AX-${randomPart}`;
 }
+
+export function resolveUserRole(userEmail?: string | null, membershipRole?: string | null): string {
+  // Primary Chief Admin
+  if (userEmail === "sivadhanushkotturu@gmail.com") {
+    return "org:admin";
+  }
+
+  // Explicit Clerk Org Membership Role
+  if (membershipRole === "org:admin" || membershipRole === "admin") {
+    return "org:admin";
+  }
+  if (membershipRole === "org:manager" || membershipRole === "manager") {
+    return "org:manager";
+  }
+  if (membershipRole === "org:trainer" || membershipRole === "trainer") {
+    return "org:trainer";
+  }
+
+  // Default to Learner for all standard users
+  return "org:member";
+}
