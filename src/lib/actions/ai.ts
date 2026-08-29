@@ -58,6 +58,7 @@ ROLE-SPECIFIC GUIDANCE:
 2. CLICKABLE LINKS:
    - When referencing platform sections, ALWAYS format them as markdown links:
      - [Course Catalog](/catalog)
+     - [Skill Check](/skill-check)
      - [Synapse](/synapse)
      - [My Learning](/my-learning)
      - [Certificates](/certificates)
@@ -367,5 +368,105 @@ Rules:
       feedback: "Strong insight! You demonstrated a practical understanding of the operational principles and applied them directly to the scenario.",
       keyStrength: "Clear conceptual comprehension and practical application.",
     },
+  };
+}
+
+// =========================================================================
+// SKILL CHECK & IDEA BENCHMARK (Up to 20 Questions on Any Concept)
+// =========================================================================
+export async function generateIdeaSkillCheck(params: {
+  topic: string;
+  difficulty: "Beginner" | "Intermediate" | "Advanced" | "Expert";
+  questionCount: number;
+}) {
+  const groq = getGroqClient();
+  const count = Math.min(20, Math.max(3, params.questionCount || 10));
+  const topic = params.topic.trim();
+
+  const systemPrompt = `You are the master assessment architect for Axoria.
+Generate a diagnostic assessment of exactly ${count} multiple-choice questions testing depth of understanding, edge cases, and practical knowledge on: "${topic}".
+Target level: ${params.difficulty}.
+
+Return ONLY a valid JSON object matching this EXACT structure (No markdown backticks, no other text):
+{
+  "topic": "${topic}",
+  "difficulty": "${params.difficulty}",
+  "questions": [
+    {
+      "id": "q1",
+      "text": "Clear conceptual or scenario question text here?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctIndex": 0,
+      "explanation": "Detailed rationale explaining why Option A is correct and why other options fail."
+    }
+  ]
+}
+
+Rules:
+- Exactly ${count} questions.
+- Each question must have 4 options and correctIndex (0, 1, 2, or 3).
+- Questions should challenge the learner appropriately based on the ${params.difficulty} tier.`;
+
+  for (const model of FALLBACK_GROQ_MODELS) {
+    try {
+      const completion = await groq.chat.completions.create({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Generate ${count} diagnostic questions on: ${topic}` },
+        ],
+        temperature: 0.3,
+        max_tokens: 4000,
+      });
+
+      const raw = completion.choices[0]?.message?.content || "";
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.questions && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+          return {
+            success: true,
+            questions: parsed.questions,
+            topic,
+            difficulty: params.difficulty,
+          };
+        }
+      }
+    } catch (err: any) {
+      console.warn(`Skill check generation failed with ${model}:`, err.message);
+    }
+  }
+
+  // Fallback questions if network fails
+  return {
+    success: true,
+    questions: [
+      {
+        id: "q_fb_1",
+        text: `What is the foundational architectural principle of ${topic}?`,
+        options: [
+          "Continuous verification and modular design",
+          "Hardcoding configuration in runtime instances",
+          "Bypassing security layers to accelerate throughput",
+          "Ignoring operational telemetry and metrics",
+        ],
+        correctIndex: 0,
+        explanation: "Continuous validation and structured operational hygiene form the core foundation.",
+      },
+      {
+        id: "q_fb_2",
+        text: `In a production failure scenario involving ${topic}, what is the recommended immediate mitigation?`,
+        options: [
+          "Isolate affected services, review audit logs, and trigger automated failover",
+          "Delete database records without backup",
+          "Silence alerts and restart the host blindly",
+          "Grant global root permissions to all services",
+        ],
+        correctIndex: 0,
+        explanation: "Controlled isolation, log analysis, and safe failover contain failure blast radiuses.",
+      },
+    ],
+    topic,
+    difficulty: params.difficulty,
   };
 }
