@@ -167,30 +167,46 @@ function getNotificationIcon(type: string) {
     default:
       return <Sparkles className="h-4 w-4 text-primary shrink-0" />;
   }
-}
-
+import { usePathname } from "next/navigation";
 import { resolveUserRole } from "@/lib/utils";
 
 export function NotificationDropdown() {
-  const { user } = useUser();
-  const { membership } = useOrganization();
+  const pathname = usePathname();
+  const { user, isLoaded: isUserLoaded } = useUser();
+  const { membership, isLoaded: isOrgLoaded } = useOrganization();
+
   const userEmail = user?.primaryEmailAddress?.emailAddress;
-  const userRole = resolveUserRole(userEmail, membership?.role);
+
+  // Pathname-aware instant role detection to prevent hydration flash
+  const initialRole = pathname.startsWith("/trainer")
+    ? "org:trainer"
+    : pathname.startsWith("/manager")
+      ? "org:manager"
+      : pathname.startsWith("/admin") || userEmail === "sivadhanushkotturu@gmail.com"
+        ? "org:admin"
+        : resolveUserRole(userEmail, membership?.role);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>(() =>
-    getRoleBasedDefaultNotifications(userRole)
+    getRoleBasedDefaultNotifications(initialRole)
   );
-  const [unreadCount, setUnreadCount] = useState(2);
+  const [unreadCount, setUnreadCount] = useState(() =>
+    getRoleBasedDefaultNotifications(initialRole).filter((n) => !n.read).length
+  );
 
-  const fetchNotifications = async () => {
-    if (!user?.id) return;
+  const fetchNotifications = async (effectiveRole: string) => {
+    if (!user?.id) {
+      const defaults = getRoleBasedDefaultNotifications(effectiveRole);
+      setNotifications(defaults);
+      setUnreadCount(defaults.filter((n) => !n.read).length);
+      return;
+    }
     try {
-      const res = await getUserNotifications(user.id, userEmail, userRole);
+      const res = await getUserNotifications(user.id, userEmail, effectiveRole);
       if (res.success && res.notifications.length > 0) {
         setNotifications(res.notifications);
         setUnreadCount(res.unreadCount);
       } else {
-        const roleDefaults = getRoleBasedDefaultNotifications(userRole);
+        const roleDefaults = getRoleBasedDefaultNotifications(effectiveRole);
         setNotifications(roleDefaults);
         setUnreadCount(roleDefaults.filter((n) => !n.read).length);
       }
@@ -200,8 +216,16 @@ export function NotificationDropdown() {
   };
 
   useEffect(() => {
-    fetchNotifications();
-  }, [user?.id, userRole]);
+    const effectiveRole = pathname.startsWith("/trainer")
+      ? "org:trainer"
+      : pathname.startsWith("/manager")
+        ? "org:manager"
+        : pathname.startsWith("/admin") || userEmail === "sivadhanushkotturu@gmail.com"
+          ? "org:admin"
+          : resolveUserRole(userEmail, membership?.role);
+
+    fetchNotifications(effectiveRole);
+  }, [user?.id, userEmail, membership?.role, pathname]);
 
   const handleMarkAsRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
