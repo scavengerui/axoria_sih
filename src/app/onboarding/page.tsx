@@ -42,6 +42,7 @@ import {
   User,
 } from "lucide-react";
 import { toast } from "sonner";
+import { createNotification } from "@/lib/actions/notification";
 
 // PRE-CONFIGURED ENTERPRISE ORGANIZATIONS
 const ORG_CODE_MAP: Record<string, { name: string; dept: string }> = {
@@ -134,6 +135,16 @@ export default function OnboardingPage() {
             : selectedRole === "trainer"
               ? "Certified Instructor"
               : "Active Learner";
+
+      // 1. Dispatch Real-time Notification to Chief Admin (sivadhanushkotturu@gmail.com)
+      const memberName = user?.fullName || user?.primaryEmailAddress?.emailAddress || "New Employee";
+      await createNotification({
+        userId: "all_admins",
+        type: "approval",
+        title: `New Team Member Joined: ${memberName}`,
+        message: `${memberName} joined ${orgInfo.name} as ${roleLabel} in ${selectedDepartment}.`,
+        link: "/admin/users",
+      });
 
       toast.success(`Joined "${orgInfo.name}" as ${roleLabel} in ${selectedDepartment}! 🎉`);
       await new Promise((resolve) => setTimeout(resolve, 800));
