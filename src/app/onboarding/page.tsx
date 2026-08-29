@@ -15,14 +15,41 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Tabs,
   TabsList,
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, X, ArrowRight, Sparkles, Key, Check } from "lucide-react";
+import {
+  Building2,
+  Plus,
+  X,
+  ArrowRight,
+  Sparkles,
+  Key,
+  Check,
+  Shield,
+  GraduationCap,
+  Briefcase,
+  User,
+} from "lucide-react";
 import { toast } from "sonner";
+
+// PRE-CONFIGURED ENTERPRISE ORGANIZATIONS
+const ORG_CODE_MAP: Record<string, { name: string; dept: string }> = {
+  "AXORIA-2025": { name: "Axoria Enterprise HQ", dept: "All Departments" },
+  "TECH-ENG-2025": { name: "Axoria Engineering & Innovation", dept: "Engineering" },
+  "CYBER-SEC-2025": { name: "Axoria Cyber Defense Wing", dept: "IT Security" },
+  "SIH2025": { name: "Smart India Hackathon Workspace", dept: "Technology" },
+};
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -42,7 +69,14 @@ export default function OnboardingPage() {
 
   // Join Org state
   const [inviteCode, setInviteCode] = useState("AXORIA-2025");
+  const [selectedRole, setSelectedRole] = useState("learner");
+  const [selectedDepartment, setSelectedDepartment] = useState("Engineering");
   const [isJoining, setIsJoining] = useState(false);
+
+  const matchedOrg = ORG_CODE_MAP[inviteCode.trim().toUpperCase()] || {
+    name: "Axoria Enterprise Hub",
+    dept: selectedDepartment,
+  };
 
   const handleAddDepartment = () => {
     const trimmed = departmentInput.trim();
@@ -90,19 +124,20 @@ export default function OnboardingPage() {
     setIsJoining(true);
     try {
       const code = inviteCode.trim().toUpperCase();
-      if (
-        code === "AXORIA-2025" ||
-        code === "AXORIA" ||
-        code === "SIH2025" ||
-        code.startsWith("ORG_") ||
-        code.length >= 4
-      ) {
-        toast.success("Joined Axoria Enterprise Workspace! 🎉");
-        await new Promise((resolve) => setTimeout(resolve, 600));
-        router.push("/dashboard");
-      } else {
-        toast.error("Invalid invite code. Try using: AXORIA-2025");
-      }
+      const orgInfo = ORG_CODE_MAP[code] || { name: "Axoria Enterprise", dept: selectedDepartment };
+
+      const roleLabel =
+        selectedRole === "admin"
+          ? "Administrator"
+          : selectedRole === "manager"
+            ? "Team Manager"
+            : selectedRole === "trainer"
+              ? "Certified Instructor"
+              : "Active Learner";
+
+      toast.success(`Joined "${orgInfo.name}" as ${roleLabel} in ${selectedDepartment}! 🎉`);
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      router.push("/dashboard");
     } catch (error) {
       console.error("Failed to join organization:", error);
       toast.error("Failed to join organization.");
@@ -125,7 +160,7 @@ export default function OnboardingPage() {
             Welcome to Axoria
           </h1>
           <p className="text-sm text-muted-foreground">
-            Set up your workspace to start building organizational capacity
+            Connect to your enterprise workspace and configure your role
           </p>
         </div>
 
@@ -145,13 +180,14 @@ export default function OnboardingPage() {
               {/* JOIN ORGANIZATION TAB */}
               <TabsContent value="join" className="mt-4 space-y-4">
                 <div>
-                  <CardTitle className="text-lg">Join an Existing Workspace</CardTitle>
+                  <CardTitle className="text-lg">Join Enterprise Workspace</CardTitle>
                   <CardDescription className="text-xs mt-1">
-                    Enter your organization invite code to connect with your team.
+                    Enter the organization invite code and select your operational role.
                   </CardDescription>
                 </div>
 
                 <form onSubmit={handleJoinOrganization} className="space-y-4">
+                  {/* Invite Code */}
                   <div className="space-y-1.5">
                     <Label htmlFor="invite-code" className="text-xs font-medium">
                       Organization Invite Code
@@ -167,11 +203,96 @@ export default function OnboardingPage() {
                         required
                       />
                     </div>
-                    <div className="p-2.5 bg-muted/40 rounded-lg border border-border/50 text-[11px] text-muted-foreground flex items-center justify-between">
-                      <span>Default Enterprise Code:</span>
-                      <Badge variant="secondary" className="font-mono text-[10px] bg-primary/10 text-primary">
-                        AXORIA-2025
-                      </Badge>
+                    {matchedOrg && (
+                      <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-0.5">
+                        <Building2 className="w-3.5 h-3.5 text-primary" /> Target:{" "}
+                        <strong className="text-foreground">{matchedOrg.name}</strong>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Role Selection */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Select Your Role</Label>
+                    <Select value={selectedRole} onValueChange={(val) => setSelectedRole(val || "learner")}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="Select platform role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="learner">
+                          <span className="flex items-center gap-2">
+                            <User className="w-3.5 h-3.5 text-success" /> Learner / Employee (Take Courses & Tests)
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="trainer">
+                          <span className="flex items-center gap-2">
+                            <GraduationCap className="w-3.5 h-3.5 text-primary" /> Trainer / Instructor (Create Courses)
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="manager">
+                          <span className="flex items-center gap-2">
+                            <Briefcase className="w-3.5 h-3.5 text-warning" /> Manager (Assign Training & Monitor Team)
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="admin">
+                          <span className="flex items-center gap-2">
+                            <Shield className="w-3.5 h-3.5 text-destructive" /> Organization Administrator (Full Access)
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Department Selection */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Select Your Department</Label>
+                    <Select value={selectedDepartment} onValueChange={(val) => setSelectedDepartment(val || "Engineering")}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Engineering">Engineering & Software Development</SelectItem>
+                        <SelectItem value="IT Security">IT Security & Cyber Defense</SelectItem>
+                        <SelectItem value="Operations">Operations & Infrastructure</SelectItem>
+                        <SelectItem value="Human Resources">Human Resources & Talent</SelectItem>
+                        <SelectItem value="Product & Design">Product Management & UI/UX</SelectItem>
+                        <SelectItem value="Compliance & Legal">Compliance & Legal Governance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Quick Code Reference */}
+                  <div className="p-3 bg-muted/40 rounded-xl border border-border/50 text-[11px] space-y-1.5">
+                    <p className="font-semibold text-foreground text-[11px]">Available Enterprise Codes:</p>
+                    <div className="grid grid-cols-2 gap-1.5 font-mono text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setInviteCode("AXORIA-2025")}
+                        className="p-1.5 bg-background border border-border rounded text-left hover:border-primary transition-colors truncate"
+                      >
+                        ⚡ AXORIA-2025 (HQ)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInviteCode("TECH-ENG-2025")}
+                        className="p-1.5 bg-background border border-border rounded text-left hover:border-primary transition-colors truncate"
+                      >
+                        💻 TECH-ENG-2025 (Eng)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInviteCode("CYBER-SEC-2025")}
+                        className="p-1.5 bg-background border border-border rounded text-left hover:border-primary transition-colors truncate"
+                      >
+                        🛡️ CYBER-SEC-2025 (Sec)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInviteCode("SIH2025")}
+                        className="p-1.5 bg-background border border-border rounded text-left hover:border-primary transition-colors truncate"
+                      >
+                        🏆 SIH2025 (Hackathon)
+                      </button>
                     </div>
                   </div>
 
@@ -191,7 +312,7 @@ export default function OnboardingPage() {
                 <div>
                   <CardTitle className="text-lg">Create New Organization</CardTitle>
                   <CardDescription className="text-xs mt-1">
-                    Start a new enterprise tenant and invite your employees.
+                    Start a new enterprise tenant and configure your company departments.
                   </CardDescription>
                 </div>
 
@@ -204,7 +325,7 @@ export default function OnboardingPage() {
                       <Building2 className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="org-name"
-                        placeholder="e.g. Axoria Enterprise"
+                        placeholder="e.g. Axoria Global Technologies"
                         value={orgName}
                         onChange={(e) => setOrgName(e.target.value)}
                         className="pl-9 text-xs h-9"
@@ -218,7 +339,7 @@ export default function OnboardingPage() {
                     <Label className="text-xs font-medium">Departments</Label>
                     <div className="flex gap-2">
                       <Input
-                        placeholder="Add department (e.g. Finance)"
+                        placeholder="Add department (e.g. Legal & Finance)"
                         value={departmentInput}
                         onChange={(e) => setDepartmentInput(e.target.value)}
                         onKeyDown={(e) => {
