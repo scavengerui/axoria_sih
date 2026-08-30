@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Zap, ShieldCheck, Award, Layers, Brain } from "lucide-react";
+import { Sparkles, Zap, ShieldCheck, Award, Brain, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface Point3D {
@@ -18,7 +18,6 @@ interface Point3D {
 export function Interactive3DOrb() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -39,8 +38,8 @@ export function Interactive3DOrb() {
 
     // Create 3D sphere points
     const points: Point3D[] = [];
-    const numPoints = 220;
-    const radius = Math.min(width, height) * 0.38;
+    const numPoints = 200;
+    const radius = Math.min(width, height) * 0.36;
 
     for (let i = 0; i < numPoints; i++) {
       const theta = Math.acos(2 * Math.random() - 1);
@@ -56,7 +55,7 @@ export function Interactive3DOrb() {
         origX: x,
         origY: y,
         origZ: z,
-        size: Math.random() * 2 + 1.2,
+        size: Math.random() * 2.2 + 1.4,
       });
     }
 
@@ -72,9 +71,8 @@ export function Interactive3DOrb() {
       const rect = canvas.getBoundingClientRect();
       const nx = (e.clientX - rect.left) / width - 0.5;
       const ny = (e.clientY - rect.top) / height - 0.5;
-      targetAngleX = ny * 1.5;
-      targetAngleY = nx * 1.5;
-      setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      targetAngleX = ny * 1.2;
+      targetAngleY = nx * 1.2;
     };
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -113,7 +111,7 @@ export function Interactive3DOrb() {
         const scale = fov / (fov + z2 + radius);
         const projX = cx + x1 * scale;
         const projY = cy + y1 * scale;
-        const alpha = Math.max(0.15, Math.min(1, (z2 + radius) / (2 * radius)));
+        const alpha = Math.max(0.2, Math.min(1, (z2 + radius) / (2 * radius)));
 
         projected.push({
           x: projX,
@@ -124,17 +122,17 @@ export function Interactive3DOrb() {
         });
       }
 
-      // Draw interconnecting holographic lines
-      ctx.lineWidth = 0.6;
+      // Draw interconnecting holographic electric blue lines
+      ctx.lineWidth = 0.75;
       for (let i = 0; i < projected.length; i++) {
         for (let j = i + 1; j < projected.length; j++) {
           const p1 = projected[i];
           const p2 = projected[j];
           const distSq = (p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2;
 
-          if (distSq < 2800) {
-            const lineAlpha = (1 - distSq / 2800) * 0.25 * ((p1.alpha + p2.alpha) / 2);
-            ctx.strokeStyle = `rgba(147, 197, 253, ${lineAlpha})`; // Soft luminous electric blue
+          if (distSq < 2600) {
+            const lineAlpha = (1 - distSq / 2600) * 0.35 * ((p1.alpha + p2.alpha) / 2);
+            ctx.strokeStyle = `rgba(37, 99, 235, ${lineAlpha})`; // Cobalt electric blue
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
@@ -146,16 +144,18 @@ export function Interactive3DOrb() {
       // Draw Points / Glowing Nodes
       for (let i = 0; i < projected.length; i++) {
         const p = projected[i];
-        ctx.fillStyle = `rgba(224, 231, 255, ${p.alpha})`;
+
+        // Main node point (vibrant blue & indigo)
+        ctx.fillStyle = `rgba(37, 99, 235, ${p.alpha * 0.9})`;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
 
-        // Extra subtle glow for front nodes
-        if (p.z > radius * 0.4) {
+        // Front glowing nodes
+        if (p.z > radius * 0.25) {
           ctx.fillStyle = `rgba(96, 165, 250, ${p.alpha * 0.4})`;
           ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size * 2.5, 0, Math.PI * 2);
+          ctx.arc(p.x, p.y, p.size * 2.2, 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -175,16 +175,16 @@ export function Interactive3DOrb() {
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full min-h-[500px] flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#0b0f19] via-[#0f172a] to-[#090d16] text-white select-none p-6"
+      className="relative w-full h-full min-h-[500px] flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50/80 via-blue-50/30 to-white select-none p-6"
     >
-      {/* Background Ambient Glows */}
-      <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* Background Soft Luminous Glows */}
+      <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-blue-400/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* 3D Canvas Layer */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full z-0 pointer-events-none" />
 
-      {/* Floating 3D Holographic Badges */}
+      {/* Floating 3D Holographic Badges with Crisp Light Aesthetic */}
       <div className="relative z-10 w-full max-w-md h-[440px] flex flex-col justify-between pointer-events-none">
         {/* Top Floating Badge */}
         <motion.div
@@ -192,30 +192,30 @@ export function Interactive3DOrb() {
           transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
           className="self-start pointer-events-auto"
         >
-          <div className="p-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl flex items-center gap-3">
-            <div className="p-2 bg-blue-500/20 rounded-xl text-blue-400">
+          <div className="p-3 bg-white/90 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-xl flex items-center gap-3">
+            <div className="p-2 bg-blue-500/10 rounded-xl text-blue-600">
               <Zap className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-xs font-bold text-white">Groq LPU Synthesis</p>
-              <p className="text-[10px] text-blue-200/70">Sub-600ms AI Curriculum Engine</p>
+              <p className="text-xs font-bold text-slate-900">Groq LPU Synthesis</p>
+              <p className="text-[10px] text-slate-500 font-medium">Sub-600ms AI Curriculum Engine</p>
             </div>
           </div>
         </motion.div>
 
         {/* Center Floating Core Badge */}
         <motion.div
-          animate={{ scale: [1, 1.03, 1] }}
+          animate={{ scale: [1, 1.02, 1] }}
           transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-          className="self-center text-center space-y-1 bg-black/40 backdrop-blur-xl border border-white/10 px-6 py-4 rounded-3xl shadow-2xl"
+          className="self-center text-center space-y-1.5 bg-white/95 backdrop-blur-2xl border border-primary/20 px-7 py-4 rounded-3xl shadow-2xl"
         >
-          <Badge variant="outline" className="text-[10px] text-blue-300 border-blue-400/30 bg-blue-500/10 mb-1">
+          <Badge variant="outline" className="text-[10px] text-primary border-primary/30 bg-primary/5 font-semibold">
             <Brain className="w-3 h-3 mr-1" /> Autonomous Capacity AI
           </Badge>
-          <h2 className="text-xl font-black tracking-tight text-white font-sans">
+          <h2 className="text-xl font-black tracking-tight text-slate-900 font-sans">
             AXORIA PLATFORM
           </h2>
-          <p className="text-[11px] text-slate-300 max-w-[240px]">
+          <p className="text-[11px] text-slate-600 font-medium max-w-[240px]">
             Zero-to-Course in &lt;2s • Verifiable Credentials
           </p>
         </motion.div>
@@ -227,13 +227,13 @@ export function Interactive3DOrb() {
             transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
             className="pointer-events-auto"
           >
-            <div className="p-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl flex items-center gap-2.5">
-              <div className="p-1.5 bg-emerald-500/20 rounded-lg text-emerald-400">
+            <div className="p-3 bg-white/90 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-xl flex items-center gap-2.5">
+              <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-600">
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-bold text-white">Zero-Trust RBAC</p>
-                <p className="text-[10px] text-emerald-200/70">Enterprise Governance</p>
+                <p className="text-xs font-bold text-slate-900">Zero-Trust RBAC</p>
+                <p className="text-[10px] text-slate-500 font-medium">Enterprise Governance</p>
               </div>
             </div>
           </motion.div>
@@ -243,13 +243,13 @@ export function Interactive3DOrb() {
             transition={{ duration: 4.2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
             className="pointer-events-auto"
           >
-            <div className="p-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl flex items-center gap-2.5">
-              <div className="p-1.5 bg-amber-500/20 rounded-lg text-amber-400">
+            <div className="p-3 bg-white/90 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-xl flex items-center gap-2.5">
+              <div className="p-1.5 bg-amber-500/10 rounded-lg text-amber-600">
                 <Award className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-bold text-white">Ledger Certificates</p>
-                <p className="text-[10px] text-amber-200/70">Immutable SHA-256 ID</p>
+                <p className="text-xs font-bold text-slate-900">Ledger Certificates</p>
+                <p className="text-[10px] text-slate-500 font-medium">Immutable SHA-256 ID</p>
               </div>
             </div>
           </motion.div>
