@@ -183,10 +183,10 @@ export default function LandingPage() {
                 {/* Left: Video & Flowchart Preview (8 Cols) */}
                 <div className="md:col-span-8 space-y-3">
                   <div className="bg-slate-900 rounded-2xl border border-slate-800 relative group overflow-hidden aspect-video flex items-center justify-center">
-                    {/* Live Open-Source CDN Video */}
+                    {/* Live Cloudinary Hosted HD Lecture Video */}
                     <video
                       ref={videoRef}
-                      src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                      src="https://res.cloudinary.com/dwkaudbjt/video/upload/v1788064864/axoria_courses/zero_trust_threat_defense_lecture.mp4"
                       autoPlay
                       loop
                       muted={isMuted}
