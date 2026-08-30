@@ -14,6 +14,7 @@ import {
   PlusCircle,
   BarChart3,
   ShieldCheck,
+  Zap,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -202,12 +203,50 @@ function LearnerDashboard() {
         <StatCard title="Enrolled Courses" value={3} icon={BookOpen} />
         <StatCard title="Completed" value={1} icon={GraduationCap} />
         <StatCard title="Certificates" value={2} icon={Award} />
-        <StatCard title="Hours Learned" value="5.5h" icon={Clock} />
+        <StatCard title="Learning Streak" value="4 Days 🔥" icon={Clock} trend="Top 5% Learner" />
       </div>
+
+      {/* Gamification & Achievements Showcase Card */}
+      <Card className="border-border overflow-hidden">
+        <CardHeader className="pb-3 border-b border-border/60 bg-muted/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-yellow-500/15 rounded-lg text-yellow-600">
+                <Award className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-bold">Gamification & Achievement Trophies</CardTitle>
+                <CardDescription className="text-xs">Level 3: Senior Synthesizer (2,050 XP)</CardDescription>
+              </div>
+            </div>
+            <Badge variant="secondary" className="text-xs bg-success/15 text-success font-semibold">
+              6 Badges Unlocked 🏆
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
+            {[
+              { title: "Recall Pioneer", icon: "💡", xp: "+250 XP" },
+              { title: "Capstone Ace", icon: "🏆", xp: "+500 XP" },
+              { title: "Prompt Architect", icon: "🧠", xp: "+300 XP" },
+              { title: "OCR Scholar", icon: "📑", xp: "+250 XP" },
+              { title: "Gladiator", icon: "⚡", xp: "+400 XP" },
+              { title: "Consistency Titan", icon: "🔥", xp: "+350 XP" },
+            ].map((b, i) => (
+              <div key={i} className="p-3 bg-muted/30 rounded-xl border border-border/60 flex flex-col items-center gap-1.5 hover:border-primary/40 transition-colors">
+                <span className="text-2xl">{b.icon}</span>
+                <p className="font-bold text-xs text-foreground truncate w-full">{b.title}</p>
+                <span className="text-[10px] font-mono text-primary font-semibold">{b.xp}</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="flex items-center gap-3">
         <Link href="/catalog">
-          <Button size="sm" className="gap-1.5 text-xs h-9">
+          <Button size="sm" className="gap-1.5 text-xs h-9 font-semibold">
             <BookOpen className="h-4 w-4" />
             Browse Catalog
           </Button>
@@ -216,6 +255,12 @@ function LearnerDashboard() {
           <Button variant="outline" size="sm" className="gap-1.5 text-xs h-9">
             <GraduationCap className="h-4 w-4" />
             My Courses
+          </Button>
+        </Link>
+        <Link href="/skill-check">
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs h-9 text-primary hover:bg-primary/5">
+            <Zap className="h-4 w-4" />
+            Skill Check Arena
           </Button>
         </Link>
       </div>

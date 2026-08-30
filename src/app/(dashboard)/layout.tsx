@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useOrganization, UserButton, OrganizationSwitcher, useUser } from "@clerk/nextjs";
 import { AskAssistant } from "@/components/ai/AskAssistant";
 import { NotificationDropdown } from "@/components/layout/NotificationDropdown";
+import { StreakHeaderWidget } from "@/components/gamification/StreakAndBadges";
 import {
   LayoutDashboard,
   BookOpen,
@@ -276,6 +277,9 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Gamification Streak & Trophy Case */}
+            <StreakHeaderWidget />
+
             {/* Native Clerk Organization Switcher */}
             <OrganizationSwitcher
               hidePersonal={false}
