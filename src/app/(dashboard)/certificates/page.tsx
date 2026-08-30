@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { Award, Download, Calendar, FileText, CheckCircle2, ShieldCheck, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -276,23 +277,24 @@ export default function CertificatesPage() {
                 </div>
 
                 <div className="flex items-center gap-2 pt-2">
-                  <Button
-                    className="flex-1 gap-1.5 text-xs h-9"
-                    variant="default"
-                    disabled={isGenerating}
-                    onClick={() => downloadCertificate(cert)}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Download PDF
-                  </Button>
+                  <Link href={`/verify/${cert.certificateId}`} className="flex-1">
+                    <Button
+                      className="w-full gap-1.5 text-xs h-9 font-semibold"
+                      variant="default"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      Verify & Share
+                    </Button>
+                  </Link>
                   <Button
                     size="icon"
                     variant="outline"
                     className="h-9 w-9 shrink-0"
-                    title="View Certificate Details"
-                    onClick={() => setSelectedCert(cert)}
+                    title="Quick Download PNG"
+                    disabled={isGenerating}
+                    onClick={() => downloadCertificate(cert)}
                   >
-                    <FileText className="h-4 w-4" />
+                    <Download className="h-4 w-4" />
                   </Button>
                 </div>
               </CardContent>

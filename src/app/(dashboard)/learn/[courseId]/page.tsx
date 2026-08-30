@@ -27,6 +27,9 @@ import {
   CheckCircle,
   Video,
   Play,
+  Printer,
+  Copy,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -75,6 +78,10 @@ export default function CoursePlayerPage({
   const [flashcardsOpen, setFlashcardsOpen] = useState(false);
   const [flashcardIndex, setFlashcardIndex] = useState(0);
   const [isCardFlipped, setIsCardFlipped] = useState(false);
+
+  // Executive Cheat Sheet Modal State
+  const [cheatSheetOpen, setCheatSheetOpen] = useState(false);
+  const [cheatSheetCopied, setCheatSheetCopied] = useState(false);
 
   // AI Assessment Quiz Modal State
   const [quizOpen, setQuizOpen] = useState(false);
@@ -344,6 +351,25 @@ export default function CoursePlayerPage({
     setQuizScore(0);
   };
 
+  const handleCopyCheatSheet = () => {
+    const text = `=== AXORIA EXECUTIVE STUDY GUIDE: ${course.title} ===\n\n` +
+      `Overview: ${course.description}\n\n` +
+      `--- OPERATIONAL ARCHITECTURE FLOWCHARTS ---\n` +
+      flatLessons.map((l: any, idx: number) => `[Lesson ${idx + 1}] ${l.title}\nFlow: ${l.diagram || "N/A"}\n`).join("\n") +
+      `\n--- CORE PRINCIPLES & GUIDELINES ---\n` +
+      `1. Continuous verification and least-privilege operational discipline.\n` +
+      `2. Automated guardrails and proactive health monitoring at every gate.\n` +
+      `3. Knowledge retention through open-ended reflection checkpoints.\n\n` +
+      `Verified by Axoria Enterprise Learning Board`;
+
+    if (typeof window !== "undefined") {
+      navigator.clipboard.writeText(text);
+      setCheatSheetCopied(true);
+      toast.success("Executive Cheat Sheet copied to clipboard!");
+      setTimeout(() => setCheatSheetCopied(false), 2500);
+    }
+  };
+
   const activeFlashcards =
     course.flashcards && course.flashcards.length > 0
       ? course.flashcards
@@ -386,6 +412,15 @@ export default function CoursePlayerPage({
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCheatSheetOpen(true)}
+              className="text-xs h-8 gap-1.5 font-medium text-foreground hover:bg-primary/5"
+            >
+              <FileText className="h-3.5 w-3.5 text-primary" /> 📑 AI Cheat Sheet
+            </Button>
+
             <Button
               variant="outline"
               size="sm"
@@ -717,6 +752,99 @@ export default function CoursePlayerPage({
           </div>
         </ScrollArea>
       </div>
+
+      {/* EXECUTIVE CHEAT SHEET MODAL */}
+      <Dialog open={cheatSheetOpen} onOpenChange={setCheatSheetOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="border-b border-border pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-base font-bold">Executive AI Cheat Sheet</DialogTitle>
+                  <DialogDescription className="text-xs">
+                    Quick reference & operational summary for {course.title}
+                  </DialogDescription>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-[10px] font-mono">
+                1-Page Summary
+              </Badge>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-6 pt-2 text-xs">
+            {/* 1. Core Architecture Flowcharts */}
+            <div className="space-y-2">
+              <h4 className="font-bold text-foreground flex items-center gap-1.5 text-xs uppercase tracking-wider">
+                <Compass className="w-3.5 h-3.5 text-primary" /> Operational Flowcharts & Topology
+              </h4>
+              <div className="space-y-2">
+                {flatLessons.map((l: any, idx: number) => (
+                  <div key={idx} className="p-3 bg-muted/40 rounded-xl border border-border/80 space-y-1">
+                    <span className="text-[11px] font-semibold text-foreground">
+                      Lesson {idx + 1}: {l.title}
+                    </span>
+                    <p className="font-mono text-[11px] text-primary">
+                      {l.diagram || "Step 1: Input ---> Step 2: Validation ---> Step 3: Enforcement"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Key Principles */}
+            <div className="space-y-2">
+              <h4 className="font-bold text-foreground flex items-center gap-1.5 text-xs uppercase tracking-wider">
+                <ShieldCheck className="w-3.5 h-3.5 text-success" /> Core Principles & Checklists
+              </h4>
+              <div className="p-4 bg-card rounded-xl border border-border space-y-2 text-muted-foreground leading-relaxed">
+                <ul className="list-disc pl-4 space-y-1.5">
+                  <li><strong>Zero-Trust Validation:</strong> Always authenticate requests at transition boundaries.</li>
+                  <li><strong>Blast-Radius Containment:</strong> Isolate failures to prevent cascading systemic downtime.</li>
+                  <li><strong>Proactive Telemetry:</strong> Log immutable audit events for continuous compliance.</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* 3. Failure Modes to Avoid */}
+            <div className="space-y-2">
+              <h4 className="font-bold text-foreground flex items-center gap-1.5 text-xs uppercase tracking-wider">
+                <Lightbulb className="w-3.5 h-3.5 text-warning" /> Critical Failure Modes to Avoid
+              </h4>
+              <div className="p-3 bg-destructive/5 rounded-xl border border-destructive/20 text-destructive text-xs space-y-1">
+                <p>⚠️ <strong>Never bypass sanity gates</strong> in production during high-pressure incidents.</p>
+                <p>⚠️ <strong>Avoid single points of failure</strong> in authentication and state persistence.</p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyCheatSheet}
+                className="text-xs h-8 gap-1.5"
+              >
+                {cheatSheetCopied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
+                {cheatSheetCopied ? "Copied!" : "Copy Summary"}
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (typeof window !== "undefined") window.print();
+                }}
+                className="text-xs h-8 gap-1.5 font-semibold"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print Cheat Sheet
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* FLASHCARDS STUDY MODAL */}
       <Dialog open={flashcardsOpen} onOpenChange={setFlashcardsOpen}>
