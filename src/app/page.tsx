@@ -172,13 +172,13 @@ export default function LandingPage() {
                     />
                   </div>
 
-                  {/* Video Meta & Timeline Header */}
+                  {/* Video Meta Header */}
                   <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
                     <span className="font-semibold text-white flex items-center gap-1.5 truncate max-w-[240px] sm:max-w-md">
                       🎬 Lecture: Zero-Trust Threat Defense Architecture
                     </span>
-                    <Badge variant="outline" className="text-[10px] text-blue-300 border-blue-400/30 font-mono bg-blue-500/10">
-                      ⏱️ 1:15 / 3:43
+                    <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/30 font-mono bg-emerald-500/10">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping mr-1" /> Active Module
                     </Badge>
                   </div>
 
