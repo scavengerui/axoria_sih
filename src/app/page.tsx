@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,9 @@ import {
   Sparkles,
   ChevronRight,
   Play,
+  Pause,
+  Volume2,
+  VolumeX,
   Compass,
   CheckCircle2,
   Lightbulb,
@@ -27,6 +31,27 @@ import {
 } from "lucide-react";
 
 export default function LandingPage() {
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+    if (isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      videoRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
+  const toggleMute = () => {
+    if (!videoRef.current) return;
+    videoRef.current.muted = !isMuted;
+    setIsMuted(!isMuted);
+  };
+
   const fadeInUp = {
     initial: { opacity: 0, y: 20 },
     whileInView: { opacity: 1, y: 0 },
@@ -157,13 +182,61 @@ export default function LandingPage() {
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                 {/* Left: Video & Flowchart Preview (8 Cols) */}
                 <div className="md:col-span-8 space-y-3">
-                  <div className="bg-slate-900 rounded-2xl p-3 border border-slate-800 relative group overflow-hidden aspect-video flex items-center justify-center">
-                    <div className="w-12 h-12 rounded-full bg-blue-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                      <Play className="w-5 h-5 fill-current ml-0.5" />
+                  <div className="bg-slate-900 rounded-2xl border border-slate-800 relative group overflow-hidden aspect-video flex items-center justify-center">
+                    {/* Live Open-Source CDN Video */}
+                    <video
+                      ref={videoRef}
+                      src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                      autoPlay
+                      loop
+                      muted={isMuted}
+                      playsInline
+                      className="w-full h-full object-cover rounded-2xl opacity-90"
+                    />
+
+                    {/* Floating Controls Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-between p-3.5 opacity-90 group-hover:opacity-100 transition-opacity">
+                      {/* Top Video Tag */}
+                      <div className="flex items-center justify-between">
+                        <Badge className="text-[10px] bg-red-600/90 text-white font-mono gap-1 border-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" /> LIVE HD LECTURE
+                        </Badge>
+                        <button
+                          onClick={toggleMute}
+                          className="p-1.5 rounded-lg bg-black/60 hover:bg-black/80 text-white text-xs backdrop-blur-md transition-colors"
+                          title={isMuted ? "Unmute Audio" : "Mute Audio"}
+                        >
+                          {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+
+                      {/* Center Play/Pause Trigger */}
+                      <button
+                        onClick={togglePlay}
+                        className="self-center w-11 h-11 rounded-full bg-blue-600/90 hover:bg-blue-600 text-white flex items-center justify-center shadow-xl hover:scale-110 transition-all"
+                        title={isPlaying ? "Pause Lecture" : "Play Lecture"}
+                      >
+                        {isPlaying ? (
+                          <Pause className="w-4 h-4 fill-current" />
+                        ) : (
+                          <Play className="w-4 h-4 fill-current ml-0.5" />
+                        )}
+                      </button>
+
+                      {/* Bottom Info & Progress Bar */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-white">
+                          <span className="truncate max-w-[260px] sm:max-w-md">
+                            🎬 Lecture: Zero-Trust Threat Defense Architecture
+                          </span>
+                          <span className="font-mono text-[10px] text-slate-300">0:45 / 2:15</span>
+                        </div>
+                        {/* Fake Video Timeline */}
+                        <div className="w-full h-1 bg-slate-700/80 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500 rounded-full w-[35%] animate-pulse" />
+                        </div>
+                      </div>
                     </div>
-                    <span className="absolute bottom-3 left-3 text-[11px] font-semibold bg-black/70 px-2 py-0.5 rounded-md">
-                      🎬 Lecture: Zero-Trust Threat Defense Architecture
-                    </span>
                   </div>
 
                   {/* Flowchart Mock */}
