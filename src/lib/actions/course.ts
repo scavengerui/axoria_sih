@@ -5,6 +5,7 @@ import { Course, ICourse } from "@/lib/models/course";
 import { Enrollment } from "@/lib/models/enrollment";
 import { Notification } from "@/lib/models/notification";
 import { getGroqClient, FALLBACK_GROQ_MODELS } from "@/lib/groq";
+import { getVideosForTopic } from "@/lib/youtube-matcher";
 import { revalidatePath } from "next/cache";
 
 export async function createCourse(data: {
@@ -24,6 +25,8 @@ export async function createCourse(data: {
       type: "video" | "pdf" | "article";
       contentUrl?: string;
       content?: string;
+      diagram?: string;
+      reflectionQuestion?: string;
       duration: number;
       order: number;
     }>;
@@ -213,7 +216,7 @@ export async function getPendingCourses() {
 }
 
 // =========================================================================
-// AI PERSONAL COURSE GENERATOR (Instant Topic Search & MongoDB Enrollment)
+// AI PERSONAL COURSE GENERATOR (With Automatic YouTube Video Matcher)
 // =========================================================================
 export async function generatePersonalAICourse(params: {
   topic: string;
@@ -231,11 +234,12 @@ export async function generatePersonalAICourse(params: {
     const numQuizzes = params.preferences?.quizCount || 3;
     const numFlashcards = params.preferences?.flashcardCount || 4;
     const difficulty = params.preferences?.difficulty || "Intermediate";
+    const topicVideos = getVideosForTopic(topic);
 
     const prompt = `You are the master pedagogical architect for Axoria learning engine.
-Create a structured, in-depth, reading-focused educational course on: "${topic}".
+Create a structured, in-depth educational course on: "${topic}".
 Difficulty: ${difficulty}.
-All lessons must be clear, structured text summaries with conceptual breakdowns and visual process diagrams (NO video requirements).
+Provide conceptual reading summaries, architecture diagrams, and reflection checkpoints.
 
 Return ONLY a valid JSON object matching this EXACT structure (no extra text):
 {
@@ -250,8 +254,8 @@ Return ONLY a valid JSON object matching this EXACT structure (no extra text):
       "lessons": [
         {
           "title": "Foundational Concepts & Principles",
-          "type": "article",
-          "duration": 10,
+          "type": "video",
+          "duration": 15,
           "order": 1,
           "content": "In-depth summary explaining the fundamental concepts, core mechanics, and why this topic is essential in modern software and enterprise engineering.",
           "diagram": "STEP 1: Ingestion / Auth ---> STEP 2: Validation Engine ---> STEP 3: Execution / Enforcement",
@@ -259,7 +263,7 @@ Return ONLY a valid JSON object matching this EXACT structure (no extra text):
         },
         {
           "title": "Operational Guidelines & Workflow Breakdown",
-          "type": "article",
+          "type": "video",
           "duration": 12,
           "order": 2,
           "content": "Detailed step-by-step best practices, operational checklists, and failure modes to avoid when implementing ${topic}.",
@@ -274,7 +278,7 @@ Return ONLY a valid JSON object matching this EXACT structure (no extra text):
       "lessons": [
         {
           "title": "Real-World Architecture & Case Studies",
-          "type": "article",
+          "type": "video",
           "duration": 13,
           "order": 1,
           "content": "Analysis of enterprise design patterns, real-world case studies, and performance optimization strategies.",
@@ -350,8 +354,8 @@ Rules:
             lessons: [
               {
                 title: "Foundational Concepts & Principles",
-                type: "article",
-                duration: 10,
+                type: "video",
+                duration: 15,
                 order: 1,
                 content: `Comprehensive training on ${topic}. Understanding core principles, foundational architecture, and practical operational workflows is essential for high-velocity teams.`,
                 diagram: "STEP 1: Input / Request ---> STEP 2: Policy & Logic Gate ---> STEP 3: Execution Output",
@@ -359,7 +363,7 @@ Rules:
               },
               {
                 title: "Operational Guidelines & Workflow Breakdown",
-                type: "article",
+                type: "video",
                 duration: 12,
                 order: 2,
                 content: `Step-by-step methodologies and best practices for ${topic}. Regular self-assessments and cross-team communication mitigate failure risks.`,
@@ -374,7 +378,7 @@ Rules:
             lessons: [
               {
                 title: "Real-World Architecture & Case Studies",
-                type: "article",
+                type: "video",
                 duration: 13,
                 order: 1,
                 content: `Analyzing enterprise adoption patterns and optimization techniques for ${topic}.`,
@@ -408,6 +412,28 @@ Rules:
       };
     }
 
+    // Automatically enrich lessons with relevant YouTube video URLs
+    let videoIndex = 0;
+    const enrichedModules = (generatedData.modules || []).map((m: any, mIdx: number) => ({
+      title: m.title || `Module ${mIdx + 1}`,
+      order: m.order || mIdx + 1,
+      lessons: (m.lessons || []).map((l: any, lIdx: number) => {
+        const assignedVideo = topicVideos[videoIndex % topicVideos.length];
+        videoIndex++;
+
+        return {
+          title: l.title || `Lesson ${lIdx + 1}`,
+          type: "video",
+          duration: l.duration || assignedVideo.duration || 12,
+          contentUrl: l.contentUrl || assignedVideo.url,
+          content: l.content || `Comprehensive structured educational training on ${l.title}.`,
+          diagram: l.diagram || "Input Context ---> Policy Verification Engine ---> Scalable Enforcement Output",
+          reflectionQuestion: l.reflectionQuestion || `In your own words, what is the most critical operational takeaway from ${l.title}?`,
+          order: l.order || lIdx + 1,
+        };
+      }),
+    }));
+
     await connectToDatabase();
 
     // 1. Save Course to MongoDB
@@ -421,7 +447,7 @@ Rules:
       createdBy: params.userId,
       orgId: params.orgId || "axoria_enterprise",
       status: "published",
-      modules: generatedData.modules,
+      modules: enrichedModules,
       metadata: {
         quizzes: generatedData.quizzes,
         flashcards: generatedData.flashcards,
@@ -449,7 +475,7 @@ Rules:
       orgId: params.orgId || "axoria_enterprise",
       type: "course_update",
       title: `✨ Personal Course Generated: ${newCourse.title}`,
-      message: `Your custom curriculum on "${topic}" has been added to My Learning with interactive reflection checkpoints.`,
+      message: `Your custom curriculum on "${topic}" with video lectures and interactive reflection checkpoints has been added to My Learning.`,
       link: `/learn/${newCourse._id}`,
       read: false,
     });

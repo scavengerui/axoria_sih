@@ -25,6 +25,8 @@ import {
   Compass,
   Lightbulb,
   CheckCircle,
+  Video,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -45,7 +47,7 @@ import { getCourseById } from "@/lib/actions/course";
 import { evaluateReflectionAnswer } from "@/lib/actions/ai";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { getCourseDetailById, CourseDetail } from "@/lib/data/courseCatalogData";
+import { getCourseDetailById, COURSES_DATABASE, CourseDetail } from "@/lib/data/courseCatalogData";
 
 export default function CoursePlayerPage({
   params,
@@ -62,6 +64,7 @@ export default function CoursePlayerPage({
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showVideo, setShowVideo] = useState(true);
 
   // In-Lesson Reflection Checkpoint State
   const [reflectionInput, setReflectionInput] = useState("");
@@ -116,8 +119,9 @@ export default function CoursePlayerPage({
                     lessons: (m.lessons || []).map((l: any, lIdx: number) => ({
                       id: l._id || `l_${idx}_${lIdx}`,
                       title: l.title,
-                      type: "article",
+                      type: l.type || "video",
                       duration: `${l.duration || 10}m`,
+                      videoUrl: l.contentUrl || l.videoUrl || "https://www.youtube.com/embed/j0ieRrwae5w",
                       articleContent:
                         l.content ||
                         "Comprehensive structured learning on core fundamentals and operational guidelines.",
@@ -138,8 +142,9 @@ export default function CoursePlayerPage({
                         {
                           id: "l_def_1",
                           title: "Foundational Concepts & Principles",
-                          type: "article",
+                          type: "video",
                           duration: "10m",
+                          videoUrl: "https://www.youtube.com/embed/j0ieRrwae5w",
                           articleContent:
                             "Comprehensive training on core fundamentals. Understanding foundational architecture and practical operational workflows is essential for high-velocity teams.",
                           diagram:
@@ -172,9 +177,21 @@ export default function CoursePlayerPage({
                       },
                     ],
             },
+            flashcards:
+              c.metadata?.flashcards && c.metadata.flashcards.length > 0
+                ? c.metadata.flashcards
+                : [
+                    {
+                      id: "fc1",
+                      front: `Core Principle of ${c.title}`,
+                      back: "Establishing consistent, verified, and proactive operational standards.",
+                    },
+                  ],
           };
           setCourse(customDetail);
         }
+      } else if (COURSES_DATABASE[courseId]) {
+        setCourse(COURSES_DATABASE[courseId]);
       }
     }
     loadCourse();
@@ -327,23 +344,26 @@ export default function CoursePlayerPage({
     setQuizScore(0);
   };
 
-  const flashcards = [
-    {
-      id: "fc1",
-      front: `Core Principle of ${course.title}`,
-      back: "Establishing consistent, verified, and proactive operational standards.",
-    },
-    {
-      id: "fc2",
-      front: "Why are mid-lesson reflection checkpoints important?",
-      back: "They reinforce active recall and validate conceptual synthesis rather than passive reading.",
-    },
-    {
-      id: "fc3",
-      front: "What constitutes passing competency?",
-      back: "Achieving >=70% score on the comprehensive AI assessment quiz.",
-    },
-  ];
+  const activeFlashcards =
+    course.flashcards && course.flashcards.length > 0
+      ? course.flashcards
+      : [
+          {
+            id: "fc1",
+            front: `Core Principle of ${course.title}`,
+            back: "Establishing consistent, verified, and proactive operational standards.",
+          },
+          {
+            id: "fc2",
+            front: "Why are mid-lesson reflection checkpoints important?",
+            back: "They reinforce active recall and validate conceptual synthesis rather than passive reading.",
+          },
+          {
+            id: "fc3",
+            front: "What constitutes passing competency?",
+            back: "Achieving >=60% score on the comprehensive AI assessment quiz.",
+          },
+        ];
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-background">
@@ -376,7 +396,7 @@ export default function CoursePlayerPage({
               }}
               className="text-xs h-8 gap-1.5 font-medium"
             >
-              <Layers className="h-3.5 w-3.5 text-primary" /> Study Flashcards
+              <Layers className="h-3.5 w-3.5 text-primary" /> Study Flashcards ({activeFlashcards.length})
             </Button>
 
             <Button
@@ -399,13 +419,42 @@ export default function CoursePlayerPage({
                 Lesson {currentLessonIndex + 1} of {flatLessons.length}
               </Badge>
               <span className="text-xs text-muted-foreground">
-                Est. Reading Time: {currentLesson?.duration || "10m"}
+                Est. Duration: {currentLesson?.duration || "15m"}
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
               {currentLesson?.title}
             </h1>
           </div>
+
+          {/* CURATED YOUTUBE VIDEO LECTURE */}
+          {currentLesson?.videoUrl && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Play className="w-3.5 h-3.5 text-primary" /> Educational Video Lecture
+                </span>
+                <button
+                  onClick={() => setShowVideo(!showVideo)}
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showVideo ? "Hide Video" : "Show Video"}
+                </button>
+              </div>
+
+              {showVideo && (
+                <div className="rounded-2xl overflow-hidden border border-border shadow-sm bg-black/90 aspect-video relative">
+                  <iframe
+                    src={currentLesson.videoUrl}
+                    title={currentLesson.title}
+                    className="w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* VISUAL PROCESS FLOW / ARCHITECTURE DIAGRAM */}
           <div className="p-5 bg-gradient-to-r from-primary/5 via-muted/40 to-primary/5 rounded-2xl border border-border space-y-2.5">
@@ -550,7 +599,7 @@ export default function CoursePlayerPage({
                 }}
                 className="gap-2 text-xs h-9 font-semibold bg-primary/10 text-primary hover:bg-primary/20"
               >
-                <Sparkles className="h-4 w-4 text-primary" /> Take AI Assessment
+                <Sparkles className="h-4 w-4 text-primary" /> Take Final Capstone Exam
               </Button>
 
               <Button
@@ -679,7 +728,7 @@ export default function CoursePlayerPage({
                 <DialogTitle className="text-base font-bold">Revision Flashcards</DialogTitle>
               </div>
               <Badge variant="secondary" className="text-xs">
-                Card {flashcardIndex + 1} of {flashcards.length}
+                Card {flashcardIndex + 1} of {activeFlashcards.length}
               </Badge>
             </div>
             <DialogDescription className="text-xs">
@@ -697,7 +746,7 @@ export default function CoursePlayerPage({
               </Badge>
 
               <p className="text-sm font-semibold text-foreground leading-relaxed max-w-md">
-                {isCardFlipped ? flashcards[flashcardIndex]?.back : flashcards[flashcardIndex]?.front}
+                {isCardFlipped ? activeFlashcards[flashcardIndex]?.back : activeFlashcards[flashcardIndex]?.front}
               </p>
 
               <span className="text-[10px] text-muted-foreground absolute bottom-4 group-hover:text-primary transition-colors">
@@ -724,9 +773,9 @@ export default function CoursePlayerPage({
                 size="sm"
                 onClick={() => {
                   setIsCardFlipped(false);
-                  setFlashcardIndex((prev) => Math.min(flashcards.length - 1, prev + 1));
+                  setFlashcardIndex((prev) => Math.min(activeFlashcards.length - 1, prev + 1));
                 }}
-                disabled={flashcardIndex === flashcards.length - 1}
+                disabled={flashcardIndex === activeFlashcards.length - 1}
                 className="text-xs h-8 gap-1"
               >
                 Next <ChevronRight className="w-4 h-4" />
