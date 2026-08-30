@@ -28,7 +28,7 @@ export default function AssignTrainingPage() {
   const [courses, setCourses] = useState<any[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
-  const [dueDate, setDueDate] = useState("2025-09-30");
+  const [dueDate, setDueDate] = useState("2026-09-30");
   const [isMandatory, setIsMandatory] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchMember, setSearchMember] = useState("");

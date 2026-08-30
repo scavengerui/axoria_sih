@@ -23,7 +23,7 @@ export default function SignInPage() {
           </Link>
 
           <Badge variant="outline" className="text-[10px] gap-1 font-mono">
-            <Sparkles className="w-3 h-3 text-primary" /> SIH 2025 Edition
+            <Sparkles className="w-3 h-3 text-primary" /> SIH 2026 Edition
           </Badge>
         </div>
 

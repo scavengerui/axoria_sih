@@ -43,7 +43,7 @@ export default function LandingPage() {
             <img src="/axoria-logo.svg" alt="Axoria" className="h-8 w-8" />
             <span className="font-extrabold tracking-wider text-lg">AXORIA</span>
             <Badge variant="outline" className="text-[10px] hidden sm:inline-flex bg-primary/5 text-primary border-primary/20">
-              SIH 2025
+              SIH 2026
             </Badge>
           </Link>
 
@@ -372,7 +372,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <img src="/axoria-logo.svg" alt="Axoria" className="h-5 w-5" />
             <span className="font-bold text-foreground">AXORIA</span>
-            <span>• Built for Smart India Hackathon 2025</span>
+            <span>• Built for Smart India Hackathon 2026</span>
           </div>
           <p>© 2026 Axoria Capacity Connect. All rights reserved.</p>
         </div>

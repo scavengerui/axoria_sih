@@ -45,7 +45,7 @@ export default function OnboardingPage() {
   const { user } = useUser();
 
   // One Single Enterprise Key
-  const [inviteCode, setInviteCode] = useState("AXORIA-2025");
+  const [inviteCode, setInviteCode] = useState("AXORIA-2026");
   const [selectedRole, setSelectedRole] = useState("learner");
   const [selectedDepartment, setSelectedDepartment] = useState("Engineering");
   const [isJoining, setIsJoining] = useState(false);
@@ -72,8 +72,8 @@ export default function OnboardingPage() {
     }
 
     const code = inviteCode.trim().toUpperCase();
-    if (code !== "AXORIA-2025" && code !== "AXORIA") {
-      toast.error("Invalid access code. Please use: AXORIA-2025");
+    if (code !== "AXORIA-2026" && code !== "AXORIA-2025" && code !== "AXORIA") {
+      toast.error("Invalid access code. Please use: AXORIA-2026");
       return;
     }
 
@@ -182,7 +182,7 @@ export default function OnboardingPage() {
                     Enterprise Access Code
                   </Label>
                   <span className="text-[10px] text-muted-foreground font-mono">
-                    Default: <strong className="text-primary">AXORIA-2025</strong>
+                    Default: <strong className="text-primary">AXORIA-2026</strong>
                   </span>
                 </div>
                 <div className="relative">

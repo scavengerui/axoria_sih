@@ -31,14 +31,14 @@ const DEFAULT_CERTIFICATES: CertificateItem[] = [
   {
     id: "cert-1",
     courseName: "Enterprise Information Security & Threat Defense",
-    issueDate: "2025-08-15",
+    issueDate: "2026-08-15",
     certificateId: "AX-SEC-92847",
     instructor: "Dr. Raghavan Sundaram",
   },
   {
     id: "cert-2",
     courseName: "Data Privacy, GDPR & Governance Compliance",
-    issueDate: "2025-08-20",
+    issueDate: "2026-08-20",
     certificateId: "AX-PRV-48192",
     instructor: "Dr. Ananya Sengupta",
   },
@@ -62,7 +62,7 @@ export default function CertificatesPage() {
             id: c._id,
             courseName: c.courseId?.title || "Enterprise Capability Training",
             issueDate: new Date(c.issuedAt).toLocaleDateString(),
-            certificateId: c.certificateId || "AX-SIH-2025",
+            certificateId: c.certificateId || "AX-SIH-2026",
             instructor: "Dr. Raghavan Sundaram",
           }));
           setCertificates(formatted);
