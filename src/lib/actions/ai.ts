@@ -59,6 +59,7 @@ ROLE-SPECIFIC GUIDANCE:
    - When referencing platform sections, ALWAYS format them as markdown links:
      - [Course Catalog](/catalog)
      - [Skill Check](/skill-check)
+     - [Personal Vault](/vault)
      - [Synapse](/synapse)
      - [My Learning](/my-learning)
      - [Certificates](/certificates)

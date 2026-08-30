@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   Sparkles,
   Zap,
+  HardDrive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ const commonNavItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Course Catalog", href: "/catalog", icon: BookOpen },
   { title: "Skill Check", href: "/skill-check", icon: Zap },
+  { title: "Personal Vault", href: "/vault", icon: HardDrive },
   { title: "Synapse", href: "/synapse", icon: Sparkles },
 ];
 
